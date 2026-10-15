@@ -5,13 +5,13 @@ import {
 } from "lucide-react";
 import { startMiniGame } from "./miniGame.js";
 
-/* 빨리 갈까, 편하게 갈까? · 50초 모션 쇼릴 (2.5D 아이소메트릭 · 네온)
+/* 빨리 갈까, 편하게 갈까? · 45초 모션 쇼릴 (2.5D 아이소메트릭 · 네온)
    - 1280×720 설계 화면을 컨테이너 폭에 맞춰 축소·확대
    - 배치 격자: 바깥 여백 좌우 80px·위아래 72px, 12열(열 64px + 간격 32px)
    - 열차 장면은 아이소메트릭 좌표(iso)로 그리고, 카메라(확대·이동)로 연출
    - 소리는 사용자가 버튼을 누른 뒤에만 Web Audio로 합성해 재생 */
 
-const DUR = 50;
+const DUR = 45;
 const SCENES = [
   { id: 1, from: 0, to: 5, label: "훅" },
   { id: 2, from: 5, to: 10.5, label: "숨 막히는 퇴근길" },
@@ -19,7 +19,7 @@ const SCENES = [
   { id: 4, from: 14.5, to: 23.5, label: "혼잡 경고" },
   { id: 5, from: 23.5, to: 33.5, label: "AI 추천 경로" },
   { id: 6, from: 33.5, to: 39.5, label: "여유로운 퇴근길" },
-  { id: 7, from: 39.5, to: 50, label: "시작하기" },
+  { id: 7, from: 39.5, to: 45, label: "시작하기" },
 ];
 const TR = 0.6;
 const TRANS = { 2: "zoom", 3: "fade", 4: "fade", 5: "fade", 6: "cubeY", 7: "zoom" };
@@ -1030,9 +1030,15 @@ function Scene6({ u }) {
   );
 }
 
-/* ---------- 7. 서비스 시작 화면 (39.5–50초) ---------- */
-function Scene7({ u }) {
+/* ---------- 7. 서비스 시작 화면 (39.5–45초) ---------- */
+// onStart가 있으면 버튼이 나타난 뒤(1.9초~)부터 눌러서 경로 찾기로 이동
+// 휴대폰처럼 영상이 작아지면 버튼은 그대로 두고, 누르는 영역만 화면 기준 높이 48px 이상으로 넓힘 (k = 영상 축소 비율)
+function Scene7({ u, onStart, k = 1 }) {
   const shine = u > 2.2 ? ((u - 2.2) % 1.4) / 1.4 : -1;
+  const live = !!onStart && u >= 1.9;
+  const Btn = live ? "button" : "span";
+  const go = (e) => { e.stopPropagation(); onStart(); };
+  const pad = Math.max(0, (48 / k - 64) / 2);
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center text-center" style={{ background: `radial-gradient(ellipse at 50% 45%, #0B2A2A, ${C.bg} 70%)` }}>
       <IsoGrid t={u} a={0.35} color="#1F5A50" />
@@ -1040,12 +1046,16 @@ function Scene7({ u }) {
         <div style={pop(u, 0.2, 0.7)}><Mark t={u} start={0.3} size={170} /></div>
         <p className="mt-4 text-[56px] font-black" style={{ ...gradText(C.cyan, C.pink), ...rise(u, 0.9, 1.4, 30) }}>빨리 갈까, 편하게 갈까?</p>
         <p className="mt-2 text-[26px]" style={{ color: C.fg, ...rise(u, 1.3, 1.8) }}>덜 붐비는 길, 지금 찾아보세요.</p>
-        <span className="relative mt-9 inline-flex items-center gap-2 overflow-hidden rounded-full px-9 py-4 text-[22px] font-bold"
+        <div className="relative mt-9">
+        <Btn {...(live ? { type: "button", onClick: go } : {})}
+          className={"relative inline-flex items-center gap-2 overflow-hidden rounded-full px-9 py-4 text-[22px] font-bold" + (live ? " cursor-pointer transition-[filter] hover:brightness-110" : "")}
           style={{ background: `linear-gradient(90deg, ${C.green}, ${C.cyan})`, color: C.bg, boxShadow: `0 0 26px ${C.cyan}88`, ...pop(u, 1.8, 2.2) }}>
           경로 찾기 시작 <ArrowRight size={22} />
           {shine >= 0 && <span className="absolute inset-y-0 w-16" style={{ left: `${-20 + shine * 140}%`,
             background: "linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent)" }} />}
-        </span>
+        </Btn>
+        {live && pad > 0 && <span aria-hidden="true" onClick={go} className="absolute cursor-pointer" style={{ inset: -pad, borderRadius: 999 }} />}
+        </div>
       </div>
       <div className="absolute flex justify-between text-[15px]" style={{ left: M, right: M, bottom: BOTTOM, color: C.sub, opacity: p(u, 2.4, 2.9) }}>
         <span>서울 지하철 1~8호선 · 공공데이터 기반</span>
@@ -1072,7 +1082,7 @@ function layerStyle(kind, role, e) {
     : { transform: `translateZ(${-800 + 800 * e}px)`, opacity: e };
 }
 
-/* ---------- 소리: 전철 소리로 짠 50초 배경 음악 ----------
+/* ---------- 소리: 전철 소리로 짠 45초 배경 음악 ----------
    붐빌 때(0–14.5초): 빨라지는 레일 소리, 모터, 불협화음, 심장 박동, 웅성거림, 급정거, 밀칠 때마다 쿵
    경고 화면(14.5–26초): 전자음 경고와 규칙적인 레일 비트, 아직 풀리지 않은 화음
    해결 후(26초~): 공기 빠지는 소리와 문 차임 뒤, 장조의 부드러운 화음과 느긋한 레일 소리 */
@@ -1210,6 +1220,15 @@ function silentWav() {
 /* ---------- 쇼릴 속 체험 게임 ----------
    만원 열차 장면이 끝나는 GAME_AT초에 쇼릴을 멈추고 한 판(2단계 난이도) 체험 → 결과 한 줄 → 쇼릴 이어서 */
 const GAME_AT = 10.2;
+// 「게임 하기」로 같은 창에서 게임에 갔다가 뒤로 가기로 돌아오면, 떠난 자리에서 멈춘 채로 이어 보기 (이 탭 안에서만 기억)
+const RESUME_KEY = "easy-nav-reel-resume";
+// 영상 공유: 재생 막대의 공유 아이콘은 영상 전용 주소(/reel)를 보냄. /reel은 영상용 미리보기 카드를 가진 작은 페이지로, 열면 /?reel=1로 넘어옴
+const SITE_URL = "https://easy-nav-iota.vercel.app";
+const ShareIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3v12" /><path d="m7 8 5-5 5 5" /><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+  </svg>
+);
 // 「게임 하기」 버튼이 여는 본 게임(1단계부터 게임 오버까지 · 명예의 전당). 사이트에 게임 페이지를 붙이면 그 주소로 바꿉니다.
 const FULL_GAME_URL = "https://claude.ai/artifact/VNki4DnLmkYqUao581B1qJ";
 function GameBreak({ ac, onDone }) {
@@ -1324,7 +1343,8 @@ function GameBreak({ ac, onDone }) {
 // fitOffset: 화면 높이에서 쇼릴 말고 차지하는 높이(상단 바·여백·아래 재생 버튼 줄, px).
 //  쇼릴 폭을 (화면 높이 − fitOffset) × 16/9 이하로 줄여서 한 화면에 들어가게 함
 // cta: 쇼릴 옆(넓은 화면)·아래(좁은 화면)에 함께 놓을 버튼들 (예: 경로 찾기 시작, 서비스 소개 보기)
-export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, cta = null }) {
+// onStart: 마지막 장면의 「경로 찾기 시작」을 눌렀을 때 할 일 (없으면 그림으로만 보임)
+export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, cta = null, onStart = null }) {
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [sound, setSound] = useState(false);
@@ -1334,10 +1354,26 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
   const audio = useRef(null);
   const gameDone = useRef(false);
   const [gameOn, setGameOn] = useState(false);
+  const [gate, setGate] = useState(false);
+  const [shareMsg, setShareMsg] = useState("");
 
   useEffect(() => {
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) { tRef.current = DUR - 1.5; setT(DUR - 1.5); setPlaying(false); }
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(RESUME_KEY) || "null"); sessionStorage.removeItem(RESUME_KEY); } catch (e) { /* 저장소를 못 쓰면 처음부터 */ }
+    // 영상 공유 링크로 들어옴: 첫 장면에서 멈추고 「소리 켜고 재생」 버튼으로 시작 (주소의 ?reel=1은 지움)
+    if (new URLSearchParams(location.search).has("reel")) {
+      saved = null; tRef.current = 0; setT(0); setPlaying(false); setGate(true);
+      try { history.replaceState(history.state, "", location.pathname + location.hash); } catch (e) { /* 무시 */ }
+    }
+    if (saved && saved.t > 0 && saved.t < DUR) {
+      tRef.current = saved.t; setT(saved.t); gameDone.current = saved.gameDone || saved.t > GAME_AT; setPlaying(false);
+    }
+    // 브라우저가 페이지를 통째로 되살린 경우(뒤로 가기 캐시)는 화면이 그대로이므로 기억만 지움
+    const clear = (e) => { if (e.persisted) try { sessionStorage.removeItem(RESUME_KEY); } catch (err) { /* 무시 */ } };
+    window.addEventListener("pageshow", clear);
+    return () => window.removeEventListener("pageshow", clear);
   }, []);
 
   useEffect(() => {
@@ -1375,6 +1411,7 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
   };
   const togglePlay = () => {
     if (tRef.current >= DUR) return replay();
+    setGate(false);
     const next = !playing; setPlaying(next);
     if (audio.current) next ? audio.current.ac.resume() : audio.current.ac.suspend();
   };
@@ -1468,6 +1505,14 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
   const showUi = () => { setUi(true); clearTimeout(uiTimer.current); uiTimer.current = setTimeout(() => setUi(false), 3000); };
   useEffect(() => () => clearTimeout(uiTimer.current), []);
   const uiOn = !playing || ui;
+  // 게임 하기: 우리 사이트 안의 주소면 같은 창에서 열고(뒤로 가기로 복귀), 다른 사이트 주소면 새 탭
+  const gameOut = /^https?:/.test(gameHref);
+  const leaveForGame = () => {
+    setPlaying(false); if (audio.current) audio.current.ac.suspend();
+    if (!gameOut) try { sessionStorage.setItem(RESUME_KEY, JSON.stringify({ t: tRef.current, gameDone: gameDone.current })); } catch (e) { /* 무시 */ }
+  };
+  // 마지막 장면 버튼: 전체 화면을 끝내고 쇼릴을 멈춘 뒤 이동
+  const goStart = onStart ? () => { exitFs(); setPlaying(false); if (audio.current) audio.current.ac.suspend(); onStart(); } : null;
   const rot = fs && phoneDev && vp.h > vp.w && !gameOn;
   let fsStyle;
   if (fs && gameOn) {
@@ -1485,6 +1530,23 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
     </svg>
   );
 
+  // 공유: 휴대폰은 기본 공유 창, 없으면 링크 복사 후 2초 안내
+  const shareReel = async () => {
+    const base = !window.claude && /^https?:$/.test(location.protocol) && !/claude\.ai$/.test(location.hostname) ? location.origin : SITE_URL;
+    const url = base + "/reel", title = "빨리 갈까, 편하게 갈까? · 45초 영상", text = "몇 분 더 쓰면 얼마나 덜 붐빌까? 45초 영상으로 확인해 보세요.";
+    if (navigator.share) {
+      try { await navigator.share({ title, text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) { /* 복사 실패 */ }
+    setShareMsg(ok ? "영상 링크를 복사했어요" : url.replace(/^https?:\/\//, ""));
+    setTimeout(() => setShareMsg(""), ok ? 2000 : 6000);
+  };
+  const startWithSound = (e) => {
+    e.stopPropagation(); setGate(false);
+    if (!sound) toggleSound(); else if (audio.current) audio.current.ac.resume();
+    setPlaying(true);
+  };
   const bar = (inVideo) => (
     <div onClick={(e) => e.stopPropagation()}
       className={inVideo
@@ -1509,13 +1571,28 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
           </button>
         ))}
       </div>
-      <span className="w-[74px] shrink-0 text-right text-[13px] tabular-nums" style={{ color: C.sub }}>{t.toFixed(1)} / {DUR}초</span>
+      {/* 좁은 화면 아래 막대는 공유 버튼 자리를 위해 시간 표시를 숨김 */}
+      <span className={"w-[74px] shrink-0 text-right text-[13px] tabular-nums" + (inVideo ? "" : " hidden sm:inline")} style={{ color: C.sub }}>{t.toFixed(1)} / {DUR}초</span>
       {/* 소리: 일반 영상 도구 막대처럼 재생 막대 오른쪽 끝. 꺼져 있을 때는 눈에 띄게 색을 입힘 */}
       <button type="button" onClick={toggleSound} aria-label={sound ? "소리 끄기" : "소리 켜기"} title={sound ? "소리 끄기" : "소리 켜기"}
         className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
         style={sound ? { background: C.bg2, color: C.fg, boxShadow: `0 0 0 1px ${C.line}` } : { background: `linear-gradient(90deg, ${C.blue}, ${C.cyan})`, color: C.bg, boxShadow: `0 0 14px ${C.cyan}88` }}>
         {sound ? <Volume2 size={16} /> : <VolumeX size={16} />}
       </button>
+      {/* 공유: 누른 버튼 바로 왼쪽에 말풍선으로 결과 안내(2초). 장면을 가리지 않도록 재생 막대 줄 안에 띄움 */}
+      <div className="relative shrink-0">
+        <button type="button" onClick={shareReel} aria-label="영상 공유하기" title="영상 공유하기"
+          className="grid h-9 w-9 place-items-center rounded-full" style={{ background: C.bg2, color: C.fg, boxShadow: `0 0 0 1px ${C.line}` }}>
+          <ShareIcon />
+        </button>
+        {shareMsg && (
+          <div role="status" className="pointer-events-none absolute right-full top-1/2 z-50 mr-3 -translate-y-1/2 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-bold md:text-[13px]"
+            style={{ background: C.bg, color: C.cyan, boxShadow: `0 0 0 1px ${C.cyan}, 0 0 14px ${C.cyan}55` }}>
+            {shareMsg}
+            <span aria-hidden="true" className="absolute left-full top-1/2 -translate-y-1/2" style={{ width: 0, height: 0, borderStyle: "solid", borderWidth: "5px 0 5px 7px", borderColor: `transparent transparent transparent ${C.cyan}` }} />
+          </div>
+        )}
+      </div>
       <button type="button" onClick={fs ? exitFs : enterFs} aria-label={fs ? "전체 화면 끝내기" : "전체 화면으로 보기"} title={fs ? "전체 화면 끝내기" : "전체 화면으로 보기"}
         className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: C.bg2, color: C.fg, boxShadow: `0 0 0 1px ${C.line}` }}>
         {fsIcon}
@@ -1534,7 +1611,7 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
         <div className="min-w-0">
           {fs && <div className="fixed inset-0 z-[69]" style={{ background: "#000" }} aria-hidden="true" />}
           <div ref={wrap} onPointerDown={wake} onMouseMove={fs ? showUi : undefined}
-            onClick={() => { if (gameOn) return; if (fs && !ui) { showUi(); return; } togglePlay(); if (fs) showUi(); }} className="group relative w-full cursor-pointer overflow-hidden rounded-2xl" style={{ aspectRatio: "16 / 9", background: C.bg, boxShadow: `0 0 0 1px ${C.line}, 0 0 40px ${C.violet}33`, ...fsStyle }}>
+            onClick={() => { if (gameOn) return; if (fs && !ui) { showUi(); return; } if (tRef.current >= DUR) { if (fs) showUi(); return; } togglePlay(); if (fs) showUi(); }} className={"group relative w-full overflow-hidden rounded-2xl " + (t >= DUR && !gameOn ? "cursor-default" : "cursor-pointer")} style={{ aspectRatio: "16 / 9", background: C.bg, boxShadow: `0 0 0 1px ${C.line}, 0 0 40px ${C.violet}33`, ...fsStyle }}>
             {fs && !gameOn && (
               <button type="button" onClick={(e) => { e.stopPropagation(); exitFs(); }} aria-label="전체 화면 끝내기"
                 className={"absolute right-3 top-3 z-40 grid h-10 w-10 place-items-center rounded-full text-[18px] font-bold transition-opacity duration-300 " + (uiOn ? "opacity-100" : "pointer-events-none opacity-0")}
@@ -1545,11 +1622,20 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
                 const V = VIEWS[s.id];
                 return (
                   <div key={s.id} className="absolute inset-0 overflow-hidden" style={{ backfaceVisibility: "hidden", ...style }}>
-                    <V t={t} u={t - s.from} />
+                    <V t={t} u={t - s.from} onStart={goStart} k={scale} />
                   </div>
                 );
               })}
             </div>
+            {gate && !playing && !gameOn && (
+              <div className="absolute inset-0 z-30 grid place-items-center" style={{ background: "rgba(6,6,20,.45)" }}>
+                <button type="button" onClick={startWithSound}
+                  className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-[15px] font-black md:px-7 md:py-4 md:text-[20px]"
+                  style={{ background: `linear-gradient(90deg, ${C.green}, ${C.cyan})`, color: C.bg, boxShadow: `0 0 28px ${C.cyan}99` }}>
+                  <Play size={20} /> 소리 켜고 재생
+                </button>
+              </div>
+            )}
             {!playing && !gameOn && t > 0.05 && t < DUR && (
               <div className="pointer-events-none absolute inset-0 grid place-items-center" style={{ background: "rgba(6,6,20,.35)" }}>
                 <span className="grid h-16 w-16 place-items-center rounded-full md:h-20 md:w-20" style={{ background: "rgba(10,11,30,.75)", color: C.fg, boxShadow: `0 0 0 1px ${C.line}, 0 0 24px ${C.cyan}55` }}><Play size={30} /></span>
@@ -1570,7 +1656,7 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
             <button type="button" onClick={togglePlay} className={btn.replace("inline-flex ", "hidden lg:inline-flex ")} style={plain}>
               {playing ? <><Pause size={15} /> 일시 정지</> : <><Play size={15} /> 재생</>}
             </button>
-            <a href={gameHref} target="_blank" rel="noopener noreferrer" onClick={() => setPlaying(false)} className={btn} style={plain}>
+            <a href={gameHref} {...(gameOut ? { target: "_blank", rel: "noopener noreferrer" } : {})} onClick={leaveForGame} className={btn} style={plain}>
               🎮 게임<span className="hidden sm:inline"> 하기</span>
             </a>
             <button type="button" onClick={replay} className={btn} style={plain}>

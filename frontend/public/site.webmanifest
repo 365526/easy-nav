@@ -1,0 +1,12 @@
+{
+  "name": "빨리 갈까, 편하게 갈까?",
+  "short_name": "편하게 갈까",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0B1E",
+  "theme_color": "#0A0B1E"
+}

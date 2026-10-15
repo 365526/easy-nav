@@ -140,10 +140,11 @@ export function Feedback() {
         <h2 className="text-[24px] font-black"><Phrases text="써 보고/불편한 점을 알려 주세요" /></h2>
         <p className="mt-2 text-[15px] text-[#A9A6D6]">받은 의견은 개발 기록에 남기고, 고친 내용을 함께 적습니다.</p>
       </div>
+      {/* 외부 설문은 제출 뒤 돌아올 길이 없어 새 탭으로 엽니다(↗ 표시로 예고) */}
       {FEEDBACK_URL ? (
         <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer"
-          className="inline-flex min-h-[48px] items-center whitespace-nowrap rounded-full bg-[#FF2E97] px-7 text-[17px] font-bold text-[#0A0B1E]">
-          의견 보내기
+          className="inline-flex min-h-[48px] items-center gap-1.5 whitespace-nowrap rounded-full bg-[#FF2E97] px-7 text-[17px] font-bold text-[#0A0B1E]">
+          의견 보내기 <span aria-hidden="true">↗</span><span className="sr-only">(새 창에서 열림)</span>
         </a>
       ) : (
         <span className="text-[15px] text-[#A9A6D6]">의견 받는 창구를 준비하고 있어요.</span>
