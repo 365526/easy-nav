@@ -221,3 +221,4 @@ __marimo__/
 node_modules/
 dist/
 .env.local
+backend/data/congestion_long.csv

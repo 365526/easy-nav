@@ -1,0 +1,355 @@
+{
+  "header": {
+    "resultCode": "00",
+    "resultMsg": "성공"
+  },
+  "body": {
+    "searchType": "duration",
+    "totalDstc": 15800,
+    "totalReqHr": 1620,
+    "totalCardCrg": 1650,
+    "trsitNmtm": 0,
+    "trfstnNms": [],
+    "exclTrfstns": [],
+    "thrghStns": [],
+    "schInclYn": "Y",
+    "paths": [
+      {
+        "dptreStn": {
+          "stnCd": "0234",
+          "stnNo": "234",
+          "stnNm": "신도림",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0233",
+          "stnNo": "233",
+          "stnNm": "대림",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1800,
+        "reqHr": 150,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:30:00",
+        "trainArvlTm": "09:32:30",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0233",
+          "stnNo": "233",
+          "stnNm": "대림",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0232",
+          "stnNo": "232",
+          "stnNm": "구로디지털단지",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1100,
+        "reqHr": 90,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:33:00",
+        "trainArvlTm": "09:34:30",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0232",
+          "stnNo": "232",
+          "stnNm": "구로디지털단지",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0231",
+          "stnNo": "231",
+          "stnNm": "신대방",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1100,
+        "reqHr": 90,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:35:00",
+        "trainArvlTm": "09:36:30",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0231",
+          "stnNo": "231",
+          "stnNm": "신대방",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0230",
+          "stnNo": "230",
+          "stnNm": "신림",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1800,
+        "reqHr": 120,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:37:00",
+        "trainArvlTm": "09:39:00",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0230",
+          "stnNo": "230",
+          "stnNm": "신림",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0229",
+          "stnNo": "229",
+          "stnNm": "봉천",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1100,
+        "reqHr": 90,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:39:30",
+        "trainArvlTm": "09:41:00",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0229",
+          "stnNo": "229",
+          "stnNm": "봉천",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0228",
+          "stnNo": "228",
+          "stnNm": "서울대입구",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1000,
+        "reqHr": 60,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:41:30",
+        "trainArvlTm": "09:42:30",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0228",
+          "stnNo": "228",
+          "stnNm": "서울대입구",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0227",
+          "stnNo": "227",
+          "stnNm": "낙성대",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1000,
+        "reqHr": 90,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:43:00",
+        "trainArvlTm": "09:44:30",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0227",
+          "stnNo": "227",
+          "stnNm": "낙성대",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0226",
+          "stnNo": "226",
+          "stnNm": "사당",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1700,
+        "reqHr": 120,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:45:00",
+        "trainArvlTm": "09:47:00",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0226",
+          "stnNo": "226",
+          "stnNm": "사당",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0225",
+          "stnNo": "225",
+          "stnNm": "방배",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1600,
+        "reqHr": 150,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:48:00",
+        "trainArvlTm": "09:50:30",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0225",
+          "stnNo": "225",
+          "stnNm": "방배",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0224",
+          "stnNo": "224",
+          "stnNm": "서초",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1700,
+        "reqHr": 120,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:51:00",
+        "trainArvlTm": "09:53:00",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0224",
+          "stnNo": "224",
+          "stnNm": "서초",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0223",
+          "stnNo": "223",
+          "stnNm": "교대",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 700,
+        "reqHr": 60,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:53:30",
+        "trainArvlTm": "09:54:30",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      },
+      {
+        "dptreStn": {
+          "stnCd": "0223",
+          "stnNo": "223",
+          "stnNm": "교대",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "arvlStn": {
+          "stnCd": "0222",
+          "stnNo": "222",
+          "stnNm": "강남",
+          "lineNm": "2호선",
+          "brlnNm": null
+        },
+        "stnSctnDstc": 1200,
+        "reqHr": 90,
+        "wtngHr": 0,
+        "tmnlStnNm": "성수",
+        "tmnlStnCd": "0211",
+        "upbdnbSe": "외선",
+        "trainno": "2141",
+        "trainDptreTm": "09:55:30",
+        "trainArvlTm": "09:57:00",
+        "trsitYn": "N",
+        "etrnYn": "N",
+        "nonstopYn": "N"
+      }
+    ]
+  }
+}
