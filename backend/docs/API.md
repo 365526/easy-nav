@@ -13,6 +13,7 @@
 | `GET /routes/congestion` | 경로 하나의 혼잡도 (평균·가장 붐비는 구간·5단계) |
 | `GET /analysis/top-congested` | 가장 붐비는 역·방향 순위 |
 | `GET /analysis/heatmap` | 역 × 시간대 혼잡도 표 |
+| `GET /analysis/summary` | 자료 요약 (규모, 요일별·시간대별 평균, 단계 분포) |
 
 ## GET /stations · 역 검색
 
@@ -121,6 +122,31 @@
   "stations": [
     { "station_no": 201, "name": "시청", "values": [10.1, 20.2, "… 39개"] }
   ]
+}
+```
+
+## GET /analysis/summary · 자료 요약
+
+분석 페이지의 데이터 소개 탭에 씁니다. 자료 규모, 요일별 하루 평균과 최고값, 시간대별 평균, 한 시간대의 단계별 역·방향 수를 돌려줍니다.
+
+| 입력값 | 필수 | 설명 |
+|---|---|---|
+| day_type | | 평일, 토요일, 일요일 (시간대별 평균과 단계 분포에 적용) |
+| time_slot | | 단계 분포를 볼 30분 칸 (기본값 8시30분) |
+
+요청 예: `/analysis/summary`
+
+```json
+{
+  "rows": 61476, "stations": 282, "base_date": "2026-06-30",
+  "day_types": [
+    { "day_type": "평일", "average": 32.8, "max": 144.6 },
+    { "day_type": "토요일", "average": 31.6, "max": 104.0 },
+    { "day_type": "일요일", "average": 22.4, "max": 81.2 }
+  ],
+  "time_slots": [ { "time_slot": "5시30분", "average": 21.3, "level": 1, "level_name": "여유" }, "… 39개" ],
+  "levels": { "day_type": "평일", "time_slot": "8시30분",
+              "counts": [ { "level": 1, "count": 235 }, "…", { "level": 5, "count": 11 } ] }
 }
 ```
 
