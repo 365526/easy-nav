@@ -1,7 +1,7 @@
 # easy-nav API 설명 문서
 
 - 서버: FastAPI (Render 배포)
-- 기본 주소: `https://<Render 서비스 이름>.onrender.com`
+- 기본 주소: `https://easy-nav-api.onrender.com`
 - Swagger UI: 기본 주소 뒤에 `/docs` — 각 API를 화면에서 바로 실행해 볼 수 있습니다.
 - 모든 API는 GET 요청이고 JSON으로 응답합니다.
 - 공통 입력값 `day_type`: 평일, 토요일, 일요일 중 하나 (기본값 평일). 다른 값이면 400 오류입니다.
