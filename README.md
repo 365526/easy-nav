@@ -1,130 +1,116 @@
-# easy-nav
-정보영재교수학습프로그램개발 과제
+# 빨리 갈까, 편하게 갈까? (easy-nav)
 
-지하철 혼잡도 기반 경로 추천 서비스
+몇 분 더 쓰면 얼마나 덜 붐빌까? 혼잡도까지 비교하는 서울 지하철 경로 추천 서비스
 
-덜 붐비는 경로를 찾아 주는 웹 서비스입니다. 공공데이터의 지하철 혼잡도 정보를 활용해 경로를 추천합니다.
+정보영재교수학습프로그램개발 · 인공지능기반 개발실습 팀 프로젝트
 
-## 기술 구성
+## 바로가기
 
-| 구분 | 사용 기술 |
-| --- | --- |
-| 화면 (frontend) | React, Vite |
-| 서버 (backend) | Python, FastAPI |
-| 데이터 | 공공데이터 API (확정 후 기재) |
-| AI | LLM API (확정 후 기재) |
-| 배포 | (확정 후 기재) |
+| 구분 | 주소 |
+|---|---|
+| 서비스 웹 | https://easy-nav-iota.vercel.app |
+| API (Swagger UI) | https://easy-nav-api.onrender.com/docs |
+| API 설명 문서 | [backend/docs/API.md](backend/docs/API.md) |
+| DB 테이블 문서 | [backend/docs/DB_TABLES.md](backend/docs/DB_TABLES.md) |
+
+> API 서버는 무료 요금제라 15분 동안 요청이 없으면 잠듭니다. 처음 열 때 1분 정도 걸릴 수 있습니다.
+
+## 해결하려는 문제
+
+지하철 앱은 가장 빠른 길과 환승이 적은 길을 알려 주지만, **그 길이 얼마나 붐비는지**는 알려 주지 않습니다. 출퇴근 시간에는 몇 분 더 걸리더라도 덜 붐비는 길을 고르고 싶은 사람이 많습니다. 이 서비스는 경로의 소요 시간과 혼잡도를 함께 보여 주고, 고르는 것은 사용자에게 맡깁니다.
+
+## 주요 기능
+
+| 기능 | 상태 |
+|---|---|
+| 역 검색 | API 완료 |
+| 경로의 구간별 혼잡도와 평균·최대 혼잡도 (5단계) | API 완료 |
+| 혼잡 구간 순위, 역 × 시간대 히트맵 (분석용) | API 완료 |
+| 빠른 길 vs 편한 길 비교 (후보 경로 2개 이상) | 진행 예정 |
+| 출발 시각 비교 (앞뒤 30분) | 진행 예정 |
+| AI 한 줄 요약 (추천 이유 설명) | 진행 예정 |
+| 역·경로 안내 도우미 (RAG) | 진행 예정 |
+
+혼잡도는 퍼센트 대신 5단계로 보여 줍니다.
+
+| 단계 | 이름 | 혼잡도 |
+|---|---|---|
+| 1 | 여유 | 34% 이하 (좌석이 모두 차는 수준까지) |
+| 2 | 보통 | 35~60% |
+| 3 | 약간 붐빔 | 61~90% |
+| 4 | 혼잡 | 91~120% |
+| 5 | 매우 혼잡 | 121% 이상 |
+
+## 서비스 아키텍처
+
+```mermaid
+flowchart LR
+    U[사용자] --> F["프론트엔드<br/>React (Vite) · Vercel"]
+    F -->|REST API| B["백엔드<br/>FastAPI · Render"]
+    B -->|SQL| D[("DB<br/>PostgreSQL · Supabase")]
+    B -->|경로 요청| R["최단경로이동정보 API<br/>서울교통공사"]
+    P["공공데이터 파일<br/>혼잡도 CSV"] -->|정제 · 적재 스크립트| D
+```
+
+1. 혼잡도 CSV를 정제해 DB에 미리 넣어 둡니다.
+2. 사용자가 출발역·도착역·시각을 넣으면 서버가 최단경로 API로 경로를 받습니다. 같은 조건의 응답은 DB에 저장해 다시 씁니다.
+3. 서버가 경로의 구간마다 그 시각의 혼잡도를 DB에서 찾아 평균과 최댓값을 계산하고 5단계로 바꿔 돌려줍니다.
+
+## 사용 데이터와 출처
+
+| 데이터 | 제공 기관 | 형태 | 기준일 | 출처 |
+|---|---|---|---|---|
+| 지하철혼잡도정보 | 서울교통공사 | CSV | 2026-06-30 | https://www.data.go.kr/data/15071311/fileData.do |
+| 최단경로이동정보 | 서울교통공사 | Open API | 호출 시점 | https://www.data.go.kr/data/15143842/openapi.do |
+
+혼잡도는 정원 대비 승차 인원(%)으로, 승객 수와 좌석 수가 같을 때가 34%입니다. 실시간 값이 아닌 분기 평균 통계입니다.
+
+## 데이터 정제
+
+| 처리 | 이유 |
+|---|---|
+| 옆으로 펼쳐진 30분 단위 39칸을 세로로 풀기 (1,671행 → 65,169행) | 역·요일·방향·시간대 하나를 한 줄로 저장하고 찾기 위해 |
+| 숫자 뒤 공백 제거, 숫자로 변환 | 원본 값에 공백이 섞여 있음 |
+| 혼잡도 0인 3,693칸 제외 (DB에는 61,476행) | 첫차 전·막차 뒤·종점 방향처럼 열차가 다니지 않는 칸. 그대로 두면 "여유"로 잘못 보임 |
+| API의 방향 표기(상행·하행)를 혼잡도 파일 표기(상선·하선)로 맞춤 | 두 자료의 표기가 다름 |
+| 특수 역번호 맞춤 (예: 2호선 성수 외선 → 9001) | 혼잡도 파일 안에서 번호가 따로 매겨진 곳 |
 
 ## 폴더 구조
 
 ```
 easy-nav/
-├── backend/     # FastAPI 서버
-│   ├── main.py
-│   ├── requirements.txt
-│   └── .env.example
-└── frontend/    # React 화면
-    ├── package.json
-    └── src/
+├── frontend/          React 소개 사이트와 서비스 화면 (Vercel 배포)
+│   ├── src/           화면 코드
+│   └── public/        게임, 아이콘, 공유 미리보기 이미지
+└── backend/           FastAPI 서버 (Render 배포)
+    ├── main.py        API
+    ├── scripts/       데이터 정제·적재·확인 스크립트, 테이블 정의(schema.sql)
+    └── docs/          API 설명 문서, DB 테이블 문서
 ```
 
-## 처음 시작하기
-
-Git, Python, Node.js가 설치되어 있어야 합니다.
-
-### 1. 저장소 받기
+## 내 컴퓨터에서 실행하기
 
 ```bash
-git clone https://github.com/365526/easy-nav.git
-cd easy-nav
-```
-
-### 2. backend 실행
-
-```bash
-cd backend
-python -m venv .venv
-```
-
-가상환경 켜기
-
-- Windows: `.venv\Scripts\activate`
-- Mac: `source .venv/bin/activate`
-
-```bash
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
-
-http://localhost:8000 에서 `{"status":"ok"}`가 보이면 정상입니다.
-
-### 3. frontend 실행
-
-새 터미널을 열고 실행합니다.
-
-```bash
+# 화면
 cd frontend
 npm install
 npm run dev
+
+# 서버 (backend/.env에 PUBLIC_DATA_API_KEY, ROUTE_API_URL, DATABASE_URL 필요)
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload      # http://127.0.0.1:8000/docs
 ```
 
-http://localhost:5173 에서 화면이 보이면 정상입니다.
+인증키와 DB 접속 주소는 `.env`에만 두고 저장소에 올리지 않습니다.
 
-### 4. API 키 설정
+## 팀 역할
 
-1. `backend/.env.example`을 복사해 같은 폴더에 `.env` 파일을 만듭니다.
-2. 단체방에서 공유받은 키를 `.env`에 넣습니다.
-
-`.env` 파일과 API 키는 절대 커밋하지 않습니다.
-
-## 협업 규칙
-
-### 작업 흐름
-
-`main`에는 직접 push하지 않습니다. 항상 브랜치를 만들어 작업하고 PR로 병합합니다.
-
-```bash
-git switch main
-git pull
-git switch -c feature/기능명
-
-# 작업 후
-git add .
-git commit -m "feat: 작업 내용"
-git push -u origin feature/기능명
-```
-
-push한 뒤 GitHub에서 Pull Request를 만들고 병합합니다. 병합이 끝난 브랜치는 삭제합니다.
-
-### 브랜치 이름
-
-- `feature/기능명`: 새 기능 (예: `feature/route-search`)
-- `fix/내용`: 오류 수정 (예: `fix/map-loading`)
-
-### 커밋 메시지
-
-| 머리말 | 용도 |
-| --- | --- |
-| `feat` | 새 기능 추가 |
-| `fix` | 오류 수정 |
-| `docs` | 문서 수정 |
-| `style` | 화면 모양, 코드 형식 변경 |
-| `chore` | 설정, 패키지 등 기타 작업 |
-
-예: `feat: 경로 검색 화면 추가`
-
-### 지켜야 할 것
-
-- 작업을 시작하기 전에 `git pull`로 최신 내용을 받습니다.
-- 담당 영역이 아닌 파일을 고칠 때는 단체방에 먼저 알립니다.
-- 패키지를 새로 설치했다면 `requirements.txt` 또는 `package.json` 변경도 함께 커밋합니다.
-- 큰 변경은 PR을 올린 뒤 단체방에 알리고 병합합니다.
-
-## 역할 분담
-
-| 이름 | 담당 | 주요 작업 |
-| --- | --- | --- |
-| (이름) | 개발 총괄 | 화면·서버 구현, LLM 연동, 배포, 저장소 관리 |
-| (이름) | 기획·데이터 조사 | 서비스 기획, 공공데이터 API 조사 및 신청 |
-| (이름) | 테스트 | 기능 점검, 오류 정리, 안내 문구 수정 |
-| (이름) | 발표 | 발표 자료 제작, 시연 및 발표 |
+| 역할 | 맡은 일 |
+|---|---|
+| 역할 1 | 기획 및 발표 |
+| 역할 2 | 시스템 구현 |
+| 역할 3 | 자료 조사 |
+| 역할 4 | 사용성 검증 |
