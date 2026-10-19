@@ -1,0 +1,134 @@
+# easy-nav API 설명 문서
+
+- 서버: FastAPI (Render 배포)
+- 기본 주소: `https://<Render 서비스 이름>.onrender.com`
+- Swagger UI: 기본 주소 뒤에 `/docs` — 각 API를 화면에서 바로 실행해 볼 수 있습니다.
+- 모든 API는 GET 요청이고 JSON으로 응답합니다.
+- 공통 입력값 `day_type`: 평일, 토요일, 일요일 중 하나 (기본값 평일). 다른 값이면 400 오류입니다.
+
+| API | 기능 |
+|---|---|
+| `GET /stations` | 역 검색 |
+| `GET /congestion/{station_no}` | 역 하나의 30분 단위 혼잡도 |
+| `GET /routes/congestion` | 경로 하나의 혼잡도 (평균·가장 붐비는 구간·5단계) |
+| `GET /analysis/top-congested` | 가장 붐비는 역·방향 순위 |
+| `GET /analysis/heatmap` | 역 × 시간대 혼잡도 표 |
+
+## GET /stations · 역 검색
+
+역 이름에 검색어가 들어간 1~8호선 역을 20개까지 찾습니다.
+
+| 입력값 | 필수 | 설명 |
+|---|---|---|
+| keyword | O | 역 이름 일부. 예: 사당 |
+
+요청 예: `/stations?keyword=사당`
+
+```json
+[
+  { "station_no": 226, "line": "2호선", "name": "사당" },
+  { "station_no": 433, "line": "4호선", "name": "사당" }
+]
+```
+
+## GET /congestion/{station_no} · 역 하나의 혼잡도
+
+5시30분부터 00시30분까지 30분 칸의 혼잡도와 단계를 시간 순서로 돌려줍니다. 열차가 다니지 않는 칸(원본 값 0)은 빠집니다.
+
+| 입력값 | 필수 | 설명 |
+|---|---|---|
+| station_no | O | 역번호 (주소 안에 넣음). 예: 226 |
+| direction | O | 상선, 하선, 내선, 외선 |
+| day_type | | 평일, 토요일, 일요일 |
+
+요청 예: `/congestion/226?direction=외선&day_type=평일`
+
+```json
+[
+  { "time_slot": "5시30분", "congestion": 88.3, "level": 3 },
+  { "time_slot": "8시30분", "congestion": 144.6, "level": 5 }
+]
+```
+
+해당 역·방향의 자료가 없으면 404입니다.
+
+## GET /routes/congestion · 경로 하나의 혼잡도
+
+최단경로 API로 가장 빠른 경로를 받고, 구간마다 그 구간을 지나는 시각의 30분 칸 혼잡도를 붙입니다. 평균은 구간 소요시간으로 가중한 값입니다. 같은 조건의 경로는 DB(route_cache)에 저장해 두었다가 다시 씁니다.
+
+| 입력값 | 필수 | 설명 |
+|---|---|---|
+| from_station | O | 출발역 이름. 예: 신도림 |
+| to_station | O | 도착역 이름. 예: 강남 |
+| depart_time | O | 출발 일시. 예: 2026-10-22T08:30 |
+| day_type | | 평일, 토요일, 일요일 |
+
+요청 예: `/routes/congestion?from_station=신도림&to_station=강남&depart_time=2026-10-22T08:30`
+
+```json
+{
+  "from": "신도림", "to": "강남", "depart_time": "2026-10-22T08:30:00", "day_type": "평일",
+  "total_minutes": 27.0,
+  "transfers": 0,
+  "average": { "congestion": 102.6, "level": 4, "level_name": "혼잡" },
+  "worst": { "station": "사당", "congestion": 144.6, "level": 5, "level_name": "매우 혼잡" },
+  "segments": [
+    { "station": "신도림", "line": "2호선", "direction": "외선", "time_slot": "8시30분",
+      "seconds": 150, "congestion": 63.5, "level": 3, "level_name": "약간 붐빔" }
+  ],
+  "missing": []
+}
+```
+
+- 환승 구간은 열차를 타지 않으므로 계산에서 뺍니다.
+- `missing`에는 혼잡도 자료가 없는 구간(1~8호선 밖, 또는 열차가 다니지 않는 시간대)의 역 이름이 들어갑니다.
+- 최단경로 API 호출에 실패하면 502, 혼잡도를 붙일 구간이 하나도 없으면 404입니다.
+
+## GET /analysis/top-congested · 가장 붐비는 역·방향 순위
+
+| 입력값 | 필수 | 설명 |
+|---|---|---|
+| time_slot | | 30분 칸 (기본값 8시30분) |
+| day_type | | 평일, 토요일, 일요일 |
+| limit | | 몇 개까지 (1~50, 기본값 10) |
+
+요청 예: `/analysis/top-congested?time_slot=8시30분&limit=3`
+
+```json
+[
+  { "name": "사당", "line": "2호선", "direction": "외선", "congestion": 144.6, "level": 5 },
+  { "name": "방배", "line": "2호선", "direction": "외선", "congestion": 133.6, "level": 5 },
+  { "name": "몽촌토성", "line": "8호선", "direction": "하선", "congestion": 132.1, "level": 5 }
+]
+```
+
+## GET /analysis/heatmap · 역 × 시간대 혼잡도 표
+
+한 호선·방향의 모든 역에 대해 30분 칸별 혼잡도를 표 모양으로 돌려줍니다. 분석 페이지의 히트맵에 씁니다. 열차가 다니지 않는 칸은 `null`입니다.
+
+| 입력값 | 필수 | 설명 |
+|---|---|---|
+| line | | 호선 (기본값 2호선) |
+| direction | | 상선, 하선, 내선, 외선 (기본값 외선) |
+| day_type | | 평일, 토요일, 일요일 |
+
+요청 예: `/analysis/heatmap?line=2호선&direction=외선`
+
+```json
+{
+  "line": "2호선", "direction": "외선", "day_type": "평일",
+  "time_slots": ["5시30분", "6시00분", "…", "00시30분"],
+  "stations": [
+    { "station_no": 201, "name": "시청", "values": [10.1, 20.2, "… 39개"] }
+  ]
+}
+```
+
+## 오류 응답
+
+| 상태 코드 | 뜻 |
+|---|---|
+| 400 | day_type 값이 잘못됨 |
+| 404 | 찾는 자료가 없음 |
+| 422 | 필수 입력값이 빠졌거나 형식이 틀림 (FastAPI가 자동으로 알려 줌) |
+| 502 | 최단경로 API 호출 실패 |
