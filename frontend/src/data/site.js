@@ -25,8 +25,8 @@ export const DEMO = {
 export const ROADMAP = [
   { status: "done", title: "소개 사이트, 홍보 쇼릴과 게임" },
   { status: "done", title: "혼잡도 정리와 5단계 계산" },
+  { status: "done", title: "혼잡도 분석 페이지" },
   { status: "now", title: "경로 추천 서버와 경로 찾기 화면" },
-  { status: "next", title: "혼잡도 분석 페이지" },
   { status: "next", title: "AI 한 줄 요약" },
   { status: "next", title: "지연·무정차 알림, 서비스 도우미" },
 ];

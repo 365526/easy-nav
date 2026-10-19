@@ -1,4 +1,4 @@
-"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 분석용 API (워크북 4)"""
+"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 분석용 API (워크북 4·5)"""
 import os
 from datetime import datetime
 
@@ -18,7 +18,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 app = FastAPI(
     title="easy-nav API",
     description="빨리 갈까, 편하게 갈까? · 지하철 경로의 소요 시간과 혼잡도를 함께 계산합니다.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 # 화면(Vercel)과 내 컴퓨터의 개발용 화면에서 이 서버를 부를 수 있게 허용합니다.
@@ -160,6 +160,33 @@ def route_congestion(from_station: str = Query(..., description="출발역 이�
         "worst": {"station": worst["station"], "congestion": worst["congestion"], **level_info(worst["congestion"])},
         "segments": segments,
         "missing": missing,
+    }
+
+
+@app.get("/analysis/summary", tags=["분석"], summary="자료 요약")
+def analysis_summary(day_type: str = "평일", time_slot: str = Query("8시30분", description="단계 분포를 볼 30분 칸")):
+    """분석 페이지의 데이터 소개 탭에 씁니다. 자료 규모, 요일별 평균, 시간대별 평균, 한 시간대의 단계 분포를 돌려줍니다."""
+    check_day_type(day_type)
+    with db() as conn:
+        size = conn.execute(
+            "select count(*) as rows, count(distinct station_no) as stations, max(base_date) as base_date"
+            " from congestion_stats").fetchone()
+        days = conn.execute(
+            "select day_type, round(avg(congestion), 1)::float as average, max(congestion)::float as max"
+            " from congestion_stats group by day_type").fetchall()
+        slots = conn.execute(
+            "select time_slot, round(avg(congestion), 1)::float as average from congestion_stats"
+            " where day_type = %s group by slot_order, time_slot order by slot_order", (day_type,)).fetchall()
+        rows = conn.execute(
+            "select level, count(*) as count from congestion_stats"
+            " where day_type = %s and time_slot = %s group by level", (day_type, time_slot)).fetchall()
+    counts = {r["level"]: r["count"] for r in rows}
+    return {
+        **size,
+        "day_types": sorted(days, key=lambda d: DAY_TYPES.index(d["day_type"])),
+        "time_slots": [{**s, **level_info(s["average"])} for s in slots],
+        "levels": {"day_type": day_type, "time_slot": time_slot,
+                   "counts": [{"level": lv, "count": counts.get(lv, 0)} for lv in range(1, 6)]},
     }
 
 
