@@ -23,10 +23,10 @@ export default function App() {
       <header className="sticky top-0 z-20 border-b border-[#2C2366] bg-[#0A0B1E]/90 backdrop-blur">
         <div className="mx-auto flex max-w-[1120px] flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-between lg:max-w-[calc(var(--stagew)+32px)]">
           <NavLink to="/" className="inline-flex items-center gap-2 text-[18px] font-black">
-            {/* 로고: 분홍(빠른 길)과 하늘(편한 길)이 교차해 목적지(흰 점)로 */}
-            <svg width="44" height="22" viewBox="-140 -70 280 140" aria-hidden="true" style={{ overflow: "visible", filter: "drop-shadow(0 0 4px #22E5FF88)" }}>
+            {/* 로고: 핑크(빠른 길)와 그린(편한 길)이 교차해 목적지(흰 점)로 */}
+            <svg width="44" height="22" viewBox="-140 -70 280 140" aria-hidden="true" style={{ overflow: "visible", filter: "drop-shadow(0 0 4px #39FFB088)" }}>
               <path d="M-120 40 C -60 40, -40 -40, 0 -40" fill="none" stroke="#FF2E97" strokeWidth="22" strokeLinecap="round" />
-              <path d="M-120 -40 C -60 -40, -40 40, 0 40 C 40 40, 60 0, 110 0" fill="none" stroke="#22E5FF" strokeWidth="22" strokeLinecap="round" />
+              <path d="M-120 -40 C -60 -40, -40 40, 0 40 C 40 40, 60 0, 110 0" fill="none" stroke="#39FFB0" strokeWidth="22" strokeLinecap="round" />
               <circle cx="110" cy="0" r="28" fill="#F2F4FF" />
             </svg>
             빨리 갈까, 편하게 갈까?

@@ -10,7 +10,7 @@
 |---|---|
 | `GET /stations` | 역 검색 |
 | `GET /congestion/{station_no}` | 역 하나의 30분 단위 혼잡도 |
-| `GET /routes/congestion` | 경로 하나의 혼잡도 (평균·가장 붐비는 구간·5단계) |
+| `GET /routes/congestion` | 경로 하나의 혼잡도 (평균·가장 붐비는 구간·5단계·계산 범위) |
 | `GET /routes/recommend` | 빠른 길과 편한 길 비교 추천 (후보 경로 최대 3개, 출발 시각 비교 포함) |
 | `GET /analysis/top-congested` | 가장 붐비는 역·방향 순위 |
 | `GET /analysis/heatmap` | 역 × 시간대 혼잡도 표 |
@@ -90,6 +90,8 @@
 
 가장 빠른 경로를 받은 뒤, 그 경로에서 갈아타는 역과 붐비는 환승역을 하나씩 빼고(`exclTrfstns`) 다시 요청해 돌아가는 경로를 최대 2개 더 받습니다. 같은 경로가 다시 오면 하나만 남깁니다. 후보마다 점수를 매겨 낮은 순서(추천 순서)로 돌려줍니다.
 
+돌아가는 경로가 혼잡도 자료가 없는 노선(9호선, 신분당선, 코레일 구간 등)으로 가면, 그 노선으로 갈아타는 역까지 쉼표로 더해(예: `사당,노량진`) 한 번 더 요청합니다. 자료가 더 많은 경로가 오면 그것으로 바꿉니다. 그래도 자료가 없는 후보는 버리지 않고 `average: null`로 알려 줍니다(워크북 7-1).
+
 | 입력값 | 필수 | 설명 |
 |---|---|---|
 | from_station | O | 출발역 이름. 예: 신도림 |
@@ -106,7 +108,7 @@
   "time_weight": 0.5,
   "candidates": [
     {
-      "rank": 1, "tags": ["빠른 길"], "avoid": null, "score": 1.196,
+      "rank": 1, "tags": ["빠른 길"], "avoid": null, "score": 1.2, "coverage": 100, "no_data_lines": [],
       "total_minutes": 27.0, "transfers": 0, "transfer_stations": [], "lines": ["2호선"],
       "average": { "congestion": 102.6, "level": 4, "level_name": "혼잡" },
       "worst": { "station": "사당", "congestion": 144.6, "level": 5, "level_name": "매우 혼잡" },
@@ -115,21 +117,26 @@
         { "shift_minutes": -60, "depart": "07:30", "average": { "congestion": 92.2, "level": 4, "level_name": "혼잡" } },
         { "shift_minutes": 60, "depart": "09:30", "average": { "congestion": 57.2, "level": 2, "level_name": "보통" } }
       ],
+      "legs": [ { "line": "2호선", "from": "신도림", "to": "강남", "minutes": 20, "average": { "congestion": 102.6, "level": 4, "level_name": "혼잡" } } ],
       "segments": [ "… /routes/congestion과 같은 모양" ],
       "missing": []
     },
-    { "rank": 2, "tags": ["편한 길"], "avoid": "사당", "…": "…" }
+    { "rank": 2, "tags": ["편한 길"], "avoid": "사당,노량진", "coverage": 90, "no_data_lines": ["신분당선"], "…": "…" }
   ]
 }
 ```
 
 - **점수** = 시간 가중치 × (소요 시간 ÷ 가장 짧은 소요 시간) + (1 − 시간 가중치) × (평균 혼잡도 ÷ 가장 낮은 평균 혼잡도). 가장 좋은 후보를 1로 놓고 몇 배인지 비교하므로, 점수가 낮을수록 좋습니다.
 - `tags`: 가장 빠른 후보에 "빠른 길", 평균 혼잡도가 가장 낮은 후보에 "편한 길"이 붙습니다. 한 후보에 둘 다 붙으면 돌아가도 덜 붐비지 않는다는 뜻입니다.
-- `avoid`: 이 후보를 만들 때 피한 역 (가장 빠른 길은 null)
+- `avoid`: 이 후보를 만들 때 피한 역. 여러 개면 쉼표로 이어짐 (가장 빠른 길은 null)
+- `coverage`: 열차를 타는 시간 중 혼잡도를 계산한 비율(%). `no_data_lines`: 혼잡도 자료가 없는 노선
+- `legs`: 같은 노선끼리 묶은 구간 (노선, 타는 역, 내리는 역, 분, 평균 혼잡도). 자료가 없는 노선은 `average`가 null
+- 혼잡도를 하나도 계산하지 못한 후보는 `average`, `worst`, `score`가 null이고 순위 맨 뒤에 옵니다. `vs_fastest`도 더 걸리는 분만 있습니다.
 - `vs_fastest`: 가장 빠른 길보다 더 걸리는 분, 낮아진 평균 혼잡도(%p), 낮아진 단계 수. 음수면 오히려 더 붐빈다는 뜻입니다.
 - `departures`: 같은 경로를 출발 시각만 1시간 전부터 1시간 뒤까지 30분 간격으로 옮겨 계산한 평균 혼잡도입니다. 실제 열차 시각은 조금 다를 수 있는 예상값이고, 자료가 없는 시간대는 `average`가 null입니다.
 - 돌아가는 경로를 받지 못하면(그 역을 빼면 길이 없는 경우 등) 그 후보만 건너뜁니다. 후보가 하나뿐일 수도 있습니다.
-- 처음 요청할 때는 최단경로 API를 최대 3번 부르므로 몇 초 걸립니다. 같은 조건은 DB에 저장된 응답을 씁니다.
+- 처음 요청할 때는 최단경로 API를 최대 5번 부르므로 몇 초 걸립니다. 같은 조건은 DB에 저장된 응답을 씁니다.
+- 빠른 길보다 25분 넘게 더 걸리는 후보는 뺍니다.
 
 ## GET /analysis/top-congested · 가장 붐비는 역·방향 순위
 

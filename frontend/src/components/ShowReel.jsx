@@ -143,7 +143,7 @@ function Mark({ t, start, size = 72 }) {
     <svg width={size} height={size * 0.6} viewBox="-140 -70 280 140" aria-hidden="true" style={{ overflow: "visible" }}>
       <path d="M-120 40 C -60 40, -40 -40, 0 -40" fill="none" stroke={C.pink} strokeWidth="22" strokeLinecap="round" filter="url(#hz-glow)"
         pathLength="1" strokeDasharray="1" strokeDashoffset={1 - d1} />
-      <path d="M-120 -40 C -60 -40, -40 40, 0 40 C 40 40, 60 0, 110 0" fill="none" stroke={C.cyan} strokeWidth="22" strokeLinecap="round" filter="url(#hz-glow)"
+      <path d="M-120 -40 C -60 -40, -40 40, 0 40 C 40 40, 60 0, 110 0" fill="none" stroke={C.green} strokeWidth="22" strokeLinecap="round" filter="url(#hz-glow)"
         pathLength="1" strokeDasharray="1" strokeDashoffset={1 - d2} />
       <circle cx="110" cy="0" r={28 * dot} fill={C.fg} filter="url(#hz-glow2)" />
     </svg>
@@ -590,7 +590,7 @@ function Scene1({ u }) {
         <div className="mt-10 flex items-center gap-5" style={rise(u, 2.4, 3.0, 30)}>
           <Mark t={u} start={2.4} size={110} />
           <div className="w-fit text-left">
-            <p className="whitespace-nowrap text-[40px] font-black" style={{ color: C.fg }}>빨리 갈까, 편하게 갈까?</p>
+            <p className="whitespace-nowrap text-[40px] font-black"><span style={{ color: C.pink }}>빨리 갈까,</span> <span style={{ color: C.green }}>편하게 갈까?</span></p>
             {/* 설명 글귀는 위 서비스명 잉크 폭('빨'의 받침 ㄹ 시작 ~ '?' 아래 점 끝)에 맞춰 자간을 넓힘 */}
             <FitWidth className="whitespace-nowrap text-[19px]" style={{ color: C.sub, ...rise(u, 3.2, 3.7, 12) }}>혼잡도까지 비교하는 지하철 경로 추천 서비스</FitWidth>
           </div>
@@ -1044,7 +1044,7 @@ function Scene7({ u, onStart, k = 1 }) {
       <IsoGrid t={u} a={0.35} color="#1F5A50" />
       <div className="relative flex flex-col items-center">
         <div style={pop(u, 0.2, 0.7)}><Mark t={u} start={0.3} size={170} /></div>
-        <p className="mt-4 text-[56px] font-black" style={{ ...gradText(C.cyan, C.pink), ...rise(u, 0.9, 1.4, 30) }}>빨리 갈까, 편하게 갈까?</p>
+        <p className="mt-4 text-[56px] font-black" style={rise(u, 0.9, 1.4, 30)}><span style={{ color: C.pink }}>빨리 갈까,</span> <span style={{ color: C.green }}>편하게 갈까?</span></p>
         <p className="mt-2 text-[26px]" style={{ color: C.fg, ...rise(u, 1.3, 1.8) }}>덜 붐비는 길, 지금 찾아보세요.</p>
         <div className="relative mt-9">
         <Btn {...(live ? { type: "button", onClick: go } : {})}

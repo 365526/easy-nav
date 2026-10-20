@@ -28,8 +28,9 @@ export default function RouteFinder() {
     day_type: asked.day,
   });
 
-  // 502(최단경로 API가 경로를 못 찾음)와 404(혼잡도를 붙일 구간 없음)는 입력을 확인하라고 안내합니다.
-  const notFound = /502|404/.test(status.error);
+  // 502: 최단경로 API가 경로를 못 찾음(역 이름 확인) · 404: 경로는 있지만 1~8호선 구간이 없어 혼잡도를 계산할 수 없음
+  const notFound = /502/.test(status.error);
+  const noData = /404/.test(status.error);
 
   function submit(e) {
     e.preventDefault();
@@ -96,7 +97,9 @@ export default function RouteFinder() {
         <label className="flex flex-col gap-2">
           <span className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-[15px] font-bold">무엇이 더 중요한가요?</span>
-            <span className="text-[14px] tabular-nums text-[#A9A6D6]">시간 {100 - comfort} : 혼잡도 {comfort}</span>
+            <span className="text-[14px] tabular-nums text-[#A9A6D6]">
+              시간 <b className="text-[#FF2E97]">{100 - comfort}</b> : 혼잡도 <b className="text-[#39FFB0]">{comfort}</b>
+            </span>
           </span>
           <input
             type="range"
@@ -106,11 +109,11 @@ export default function RouteFinder() {
             value={comfort}
             onChange={(e) => setComfort(Number(e.target.value))}
             aria-valuetext={`시간 ${100 - comfort}, 혼잡도 ${comfort}`}
-            className="h-[44px] w-full cursor-pointer accent-[#22E5FF]"
+            className="tradeoff"
           />
           <span className="flex justify-between text-[14px] font-bold">
-            <span>빠르게</span>
-            <span>편하게</span>
+            <span className="text-[#FF2E97]">빠르게</span>
+            <span className="text-[#39FFB0]">편하게</span>
           </span>
         </label>
 
@@ -124,7 +127,13 @@ export default function RouteFinder() {
           <p className="text-[15px] text-[#A9A6D6]">
             {asked.from} → {asked.to} · {asked.day} {asked.time} 출발
           </p>
-          {notFound ? (
+          {noData ? (
+            <p role="alert" className="rounded-xl border border-[#FF2E97]/60 bg-[#FF2E97]/10 px-4 py-3 text-[15px] leading-relaxed">
+              이 구간은 혼잡도 자료가 있는 1~8호선을 지나지 않습니다.
+              <br />
+              9호선, 신분당선, 코레일 구간 등은 아직 혼잡도를 계산할 수 없습니다.
+            </p>
+          ) : notFound ? (
             <p role="alert" className="rounded-xl border border-[#FF2E97]/60 bg-[#FF2E97]/10 px-4 py-3 text-[15px] leading-relaxed">
               경로를 찾지 못했습니다.
               <br />
