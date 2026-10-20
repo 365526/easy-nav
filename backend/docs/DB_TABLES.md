@@ -31,6 +31,7 @@ erDiagram
         text arvl_stn "도착역 이름"
         timestamp search_dt "출발 일시"
         text search_type "검색 조건"
+        text excl_stn "피한 역 (없으면 빈칸)"
         jsonb response "최단경로 API 응답"
         timestamptz created_at "저장 시각"
     }
@@ -73,10 +74,11 @@ erDiagram
 | arvl_stn | text | | 도착역 이름 |
 | search_dt | timestamp | | 출발 일시 |
 | search_type | text | | 검색 조건 (duration = 최단시간) |
+| excl_stn | text | | 피한 역 이름. 돌아가는 경로를 받을 때 최단경로 API에 넘긴 제외역(`exclTrfstns`)이고, 가장 빠른 경로는 빈칸 (워크북 6에서 추가) |
 | response | jsonb | | 최단경로 API 응답 원문 |
 | created_at | timestamptz | | 저장한 시각 |
 
-- 같은 출발역·도착역·출발 일시·검색 조건은 한 줄만 저장합니다. 같은 조건으로 다시 요청하면 API를 부르지 않고 저장된 응답을 씁니다. (하루 호출 한도 10,000건 대비)
+- 같은 출발역·도착역·출발 일시·검색 조건·피한 역은 한 줄만 저장합니다. 같은 조건으로 다시 요청하면 API를 부르지 않고 저장된 응답을 씁니다. (하루 호출 한도 10,000건 대비)
 
 ## 혼잡도 5단계 기준
 
