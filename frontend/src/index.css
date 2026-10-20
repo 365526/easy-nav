@@ -71,3 +71,70 @@ input.tradeoff:focus-visible {
   outline-offset: 4px;
   border-radius: 999px;
 }
+
+/* AI 안내 도우미 말풍선: 모서리를 계단처럼 깎은 픽셀 테두리(2px, 사이언)와 픽셀 꼬리 */
+/*  같은 모양을 두 겹(바깥 사이언 줄 + 안쪽 남색 바탕)으로 겹쳐 테두리를 만듭니다. */
+.guide-bubble {
+  --s: 4px;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  filter: drop-shadow(0 0 6px rgba(34, 229, 255, 0.55));
+}
+.guide-bubble-line,
+.guide-bubble-body {
+  clip-path: polygon(
+    calc(var(--s) * 2) 0, calc(100% - var(--s) * 2) 0, calc(100% - var(--s) * 2) var(--s), calc(100% - var(--s)) var(--s),
+    calc(100% - var(--s)) calc(var(--s) * 2), 100% calc(var(--s) * 2), 100% calc(100% - var(--s) * 2), calc(100% - var(--s)) calc(100% - var(--s) * 2),
+    calc(100% - var(--s)) calc(100% - var(--s)), calc(100% - var(--s) * 2) calc(100% - var(--s)), calc(100% - var(--s) * 2) 100%, calc(var(--s) * 2) 100%,
+    calc(var(--s) * 2) calc(100% - var(--s)), var(--s) calc(100% - var(--s)), var(--s) calc(100% - var(--s) * 2), 0 calc(100% - var(--s) * 2),
+    0 calc(var(--s) * 2), var(--s) calc(var(--s) * 2), var(--s) var(--s), calc(var(--s) * 2) var(--s)
+  );
+}
+.guide-bubble-line {
+  background: #22e5ff;
+  padding: 2px;
+}
+.guide-bubble-body {
+  background: #0c1730;
+  padding: 14px 18px;
+}
+.guide-tail {
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  z-index: 1;
+  width: 14px;
+  height: 20px;
+  margin-top: -10px;
+  shape-rendering: crispEdges;
+}
+
+/* 찾는 중: 점 3개가 0 → 1 → 2 → 3개로 하나씩 켜짐 (한 박자 0.5초, 2초마다 반복) */
+.blink {
+  animation: blink0 2s steps(1, end) infinite;
+}
+.blink1 {
+  animation-name: blink1;
+}
+.blink2 {
+  animation-name: blink2;
+}
+@keyframes blink0 {
+  0% { opacity: 0; }
+  25%, 100% { opacity: 1; }
+}
+@keyframes blink1 {
+  0% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+@keyframes blink2 {
+  0% { opacity: 0; }
+  75%, 100% { opacity: 1; }
+}
+/* 기기에서 '동작 줄이기'를 켠 사람에게는 움직이지 않고 점 3개를 모두 보여 줍니다. */
+@media (prefers-reduced-motion: reduce) {
+  .blink {
+    animation: none;
+  }
+}

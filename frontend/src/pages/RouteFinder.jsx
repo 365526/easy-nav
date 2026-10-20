@@ -4,6 +4,7 @@ import Phrases from "../components/Phrases.jsx";
 import { useApi, LoadState } from "../api.jsx";
 import StationInput from "../components/route/StationInput.jsx";
 import RouteResult from "../components/route/RouteResult.jsx";
+import AIGuide from "../components/guide/AIGuide.jsx";
 import { DAYS, nextDate } from "../components/route/routeUtils.js";
 
 // 경로 찾기: 출발역·도착역·요일·시각을 넣으면 /routes/recommend로 후보 경로를 받아 비교합니다.
@@ -145,6 +146,8 @@ export default function RouteFinder() {
           {data && <RouteResult key={JSON.stringify(asked)} data={data} timeWeight={1 - comfort / 100} />}
         </section>
       )}
+
+      <AIGuide />
     </div>
   );
 }
