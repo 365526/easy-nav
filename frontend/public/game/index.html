@@ -13,7 +13,7 @@
 <meta property="og:url" content="https://easy-nav-iota.vercel.app/game">
 <meta property="og:title" content="혼잡한 열차를 피해서 목적지로!">
 <meta property="og:description" content="단계마다 새 노선도, 퇴근길 탈출 게임. 당신의 점수는 몇 점일까요?">
-<meta property="og:image" content="https://easy-nav-iota.vercel.app/og-game.png">
+<meta property="og:image" content="https://easy-nav-iota.vercel.app/og-game.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
@@ -90,7 +90,7 @@ h1 .pbr{display:none}
 .pitch b{display:flex;align-items:center;justify-content:center;gap:10px;font-size:clamp(20px,3.6vw,26px);font-weight:900;margin-bottom:2px}
 .pitch .g{background:linear-gradient(90deg,var(--pink),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
 .pitch .gr{background:linear-gradient(90deg,var(--green),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
-.pitch .logo{width:1.9em;height:auto;flex:none;overflow:visible;filter:drop-shadow(0 0 6px #22E5FF88) drop-shadow(0 0 10px #FF2E9755)}
+.pitch .logo{width:1.9em;height:auto;flex:none;overflow:visible;filter:drop-shadow(0 0 6px #39FFB088) drop-shadow(0 0 10px #FF2E9755)}
 .board h3.bh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .mybest{font-size:13px;font-weight:700;color:var(--sub);white-space:nowrap}
 .mybest b{color:var(--cyan);font-size:16px;font-weight:900;margin-left:4px}
@@ -250,7 +250,7 @@ h1 .pbr{display:none}
         <p id="overMsg"></p>
         <button class="sharebtn" id="shareBtn" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>점수 공유하기</button>
         <p class="share-note" id="shareNote" aria-live="polite"></p>
-        <div class="pitch"><b><svg class="logo" viewBox="-140 -70 280 140" aria-hidden="true"><path d="M-120 40 C -60 40, -40 -40, 0 -40" fill="none" stroke="#FF2E97" stroke-width="22" stroke-linecap="round"/><path d="M-120 -40 C -60 -40, -40 40, 0 40 C 40 40, 60 0, 110 0" fill="none" stroke="#22E5FF" stroke-width="22" stroke-linecap="round"/><circle cx="110" cy="0" r="28" fill="#F2F4FF"/></svg><span><span class="g">빨리 갈까</span>, <span class="gr">편하게 갈까?</span></span></b><span class="pl">공공데이터로 덜 붐비는 길을 미리 찾아 드려요.</span></div>
+        <div class="pitch"><b><svg class="logo" viewBox="-140 -70 280 140" aria-hidden="true"><path d="M-120 40 C -60 40, -40 -40, 0 -40" fill="none" stroke="#FF2E97" stroke-width="22" stroke-linecap="round"/><path d="M-120 -40 C -60 -40, -40 40, 0 40 C 40 40, 60 0, 110 0" fill="none" stroke="#39FFB0" stroke-width="22" stroke-linecap="round"/><circle cx="110" cy="0" r="28" fill="#F2F4FF"/></svg><span><span class="g">빨리 갈까</span>, <span class="gr">편하게 갈까?</span></span></b><span class="pl">공공데이터로 덜 붐비는 길을 미리 찾아 드려요.</span></div>
         <div class="board"><h3 class="bh"><span>👑 명예의 전당</span><span class="mybest" id="myBestEl" hidden>내 최고 기록 <b id="myBestVal"></b></span></h3>
           <p class="save-note" id="saveNote" aria-live="polite"></p>
           <form class="save" id="saveForm" hidden>

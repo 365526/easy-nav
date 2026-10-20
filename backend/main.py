@@ -1,4 +1,4 @@
-"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API (워크북 4~6)"""
+"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API (워크북 4~6, 7-1)"""
 import os
 from datetime import datetime
 
@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 
-from route_logic import avoid_candidates, describe_route, fetch_route, level_info, rank_routes
+from route_logic import MAX_EXTRA_MINUTES, avoid_candidates, describe_route, fetch_route, level_info, no_data_entry, rank_routes
 
 load_dotenv()
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -16,7 +16,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 app = FastAPI(
     title="easy-nav API",
     description="빨리 갈까, 편하게 갈까? · 지하철 경로의 소요 시간과 혼잡도를 함께 계산합니다.",
-    version="0.3.0",
+    version="0.3.1",
 )
 
 # 화면(Vercel)과 내 컴퓨터의 개발용 화면에서 이 서버를 부를 수 있게 허용합니다.
@@ -80,14 +80,14 @@ def route_congestion(from_station: str = Query(..., description="출발역 이�
     check_day_type(day_type)
     with db() as conn:
         route = fetch_route(conn, from_station, to_station, depart_time)["body"]
-        info = describe_route(conn, route, day_type, depart_time)
-    if info is None:
+        info = describe_route(conn, route, day_type, depart_time, to_station)
+    if info is None or info["average"] is None:
         raise HTTPException(404, "이 경로에는 혼잡도를 붙일 수 있는 1~8호선 구간이 없습니다.")
     return {
         "from": from_station, "to": to_station, "depart_time": depart_time, "day_type": day_type,
         "total_minutes": info["total_minutes"], "transfers": info["transfers"],
         "average": info["average"], "worst": info["worst"],
-        "segments": info["segments"], "missing": info["missing"],
+        "segments": info["segments"], "missing": info["missing"], "coverage": info["coverage"],
     }
 
 
@@ -98,23 +98,35 @@ def recommend(from_station: str = Query(..., description="출발역 이름. 예:
               day_type: str = "평일",
               time_weight: float = Query(0.5, ge=0, le=1, description="1에 가까울수록 시간을, 0에 가까울수록 덜 붐비는 것을 중시")):
     """가장 빠른 길과, 붐비는 역을 피해 돌아가는 길을 최대 2개 더 받아 비교합니다.
-    후보마다 평균 혼잡도, 가장 붐비는 구간, 빠른 길과의 차이, 출발 시각을 앞뒤 1시간 옮겼을 때의 평균 혼잡도를 붙이고
-    시간 가중치로 점수를 매겨 추천 순서대로 돌려줍니다."""
+    돌아가는 길이 혼잡도 자료가 없는 노선(9호선, 신분당선 등)으로 가면, 그 노선으로 갈아타는 역도 함께 빼고 한 번 더 받습니다.
+    그래도 자료가 없는 후보는 버리지 않고 average: null, no_data_lines로 알려 줍니다."""
     check_day_type(day_type)
     with db() as conn:
         first = fetch_route(conn, from_station, to_station, depart_time)["body"]
-        fastest = describe_route(conn, first, day_type, depart_time)
-        if fastest is None:
+        fastest = describe_route(conn, first, day_type, depart_time, to_station)
+        if fastest is None or fastest["average"] is None:
             raise HTTPException(404, "이 경로에는 혼잡도를 붙일 수 있는 1~8호선 구간이 없습니다.")
         candidates = [{**fastest, "avoid": None}]
-        for name in avoid_candidates(conn, first, fastest, from_station, to_station):
+
+        def ask(exclude):
+            """제외역을 넣어 경로를 받아 정리합니다. 길이 없으면(API 오류) None"""
             try:
-                other = fetch_route(conn, from_station, to_station, depart_time, exclude=name)["body"]
-            except HTTPException:              # 그 역을 빼면 길이 없으면 건너뜁니다.
-                continue
-            info = describe_route(conn, other, day_type, depart_time)
-            if info and all(info["signature"] != c["signature"] for c in candidates):
-                candidates.append({**info, "avoid": name})
+                route = fetch_route(conn, from_station, to_station, depart_time, exclude=exclude)["body"]
+            except HTTPException:
+                return None
+            info = describe_route(conn, route, day_type, depart_time, to_station)
+            return {**info, "avoid": exclude} if info else None
+
+        for name in avoid_candidates(conn, first, fastest, from_station, to_station):
+            other = ask(name)
+            entry = no_data_entry(other) if other else None
+            if entry and entry not in (from_station, to_station):
+                retry = ask(f"{name},{entry}")   # 예: "사당,노량진" → 9호선 대신 7호선으로 돌아가는 길
+                if retry and retry["coverage"] > other["coverage"]:
+                    other = retry
+            if (other and other["total_minutes"] - fastest["total_minutes"] <= MAX_EXTRA_MINUTES
+                    and all(other["signature"] != c["signature"] for c in candidates)):
+                candidates.append(other)
     for c in candidates:
         del c["signature"]
     ranked = rank_routes(candidates, time_weight)

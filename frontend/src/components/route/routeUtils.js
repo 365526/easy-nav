@@ -44,32 +44,18 @@ export function addMinutes(clock, minutes) {
 // 슬라이더를 움직일 때 서버에 다시 묻지 않고 화면에서 점수를 다시 매깁니다.
 // 서버(route_logic.py의 rank_routes)와 같은 식입니다.
 //   점수 = 시간 가중치 × (소요 시간 ÷ 가장 짧은 소요 시간) + (1 − 시간 가중치) × (평균 혼잡도 ÷ 가장 낮은 평균 혼잡도)
+// 혼잡도 자료가 없는 후보(average: null)는 점수를 매기지 않고 맨 뒤에 둡니다.
 export function rerank(candidates, timeWeight) {
-  const bestMinutes = Math.min(...candidates.map((c) => c.total_minutes));
-  const bestCongestion = Math.min(...candidates.map((c) => c.average.congestion));
-  return candidates
+  const scored = candidates.filter((c) => c.average);
+  const unscored = candidates.filter((c) => !c.average);
+  const bestMinutes = Math.min(...scored.map((c) => c.total_minutes));
+  const bestCongestion = Math.min(...scored.map((c) => c.average.congestion));
+  const withScore = scored
     .map((c) => ({
       ...c,
       key: c.avoid ?? "fastest",
       score: timeWeight * (c.total_minutes / bestMinutes) + (1 - timeWeight) * (c.average.congestion / bestCongestion),
     }))
     .sort((a, b) => a.score - b.score);
-}
-
-// 구간 목록을 같은 노선끼리 묶습니다. 예: 2호선 신도림 → 대림, 7호선 대림 → 고속터미널
-export function legs(segments, destination) {
-  const out = [];
-  for (const s of segments) {
-    const last = out[out.length - 1];
-    if (last && last.line === s.line) {
-      last.parts.push(s);
-    } else {
-      out.push({ line: s.line, from: s.station, parts: [s] });
-    }
-  }
-  return out.map((leg, i) => {
-    const seconds = leg.parts.reduce((sum, p) => sum + p.seconds, 0);
-    const average = leg.parts.reduce((sum, p) => sum + p.congestion * p.seconds, 0) / seconds;
-    return { line: leg.line, from: leg.from, to: out[i + 1]?.from ?? destination, minutes: Math.round(seconds / 60), average, level: toLevel(average) };
-  });
+  return [...withScore, ...unscored.map((c) => ({ ...c, key: c.avoid ?? "fastest", score: null }))];
 }

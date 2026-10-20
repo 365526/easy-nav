@@ -27,3 +27,47 @@ body {
   font-family: var(--font-sans);
   word-break: keep-all;
 }
+
+/* 경로 찾기의 "빠르게 ↔ 편하게" 슬라이더: 막대 전체를 핑크(빠른 길) → 보라 → 그린(편한 길)으로 칠하고 손잡이는 흰 원 */
+/*  (기본 슬라이더는 막대 색을 바꿀 수 없어 모양을 직접 그립니다. 크롬·사파리는 -webkit-, 파이어폭스는 -moz-) */
+input.tradeoff {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+input.tradeoff::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff2e97, #9b5cff, #39ffb0);
+}
+input.tradeoff::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff2e97, #9b5cff, #39ffb0);
+}
+input.tradeoff::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 4px #120e2e, 0 0 16px 5px rgba(255, 255, 255, 0.5);
+}
+input.tradeoff::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 4px #120e2e, 0 0 16px 5px rgba(255, 255, 255, 0.5);
+}
+input.tradeoff:focus-visible {
+  outline: 2px solid #f2f4ff;
+  outline-offset: 4px;
+  border-radius: 999px;
+}

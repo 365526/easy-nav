@@ -7,6 +7,20 @@ const REPO = "https://github.com/365526/easy-nav";
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 const dayName = (date) => WEEKDAY[new Date(`${date}T00:00:00`).getDay()];
 
+// 기록 문장 속 {#FF2E97}처럼 쓴 색 코드는 작은 색상표 네모와 코드로 보여 줍니다.
+function Item({ text }) {
+  return text.split(/\{(#[0-9A-Fa-f]{6})\}/).map((part, i) =>
+    i % 2 ? (
+      <span key={i} className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
+        <span aria-hidden="true" className="inline-block h-3.5 w-3.5 rounded-[3px] ring-1 ring-white/30" style={{ background: part }} />
+        <code className="text-[14px] text-[#F2F4FF]">{part}</code>
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 // 같은 날짜의 기록을 하나로 묶습니다.
 //  devlog.js는 새 기록이 맨 위이므로 날짜는 최신순 그대로 두고,
 //  하루 안에서는 먼저 한 작업이 위에 오도록 순서를 뒤집습니다.
@@ -64,7 +78,7 @@ export default function DevLog() {
                       ))}
                     </h3>
                     <ul className="mt-2 list-disc pl-5 text-[15px] leading-relaxed text-[#A9A6D6]">
-                      {entry.items.map((item) => <li key={item}>{item}</li>)}
+                      {entry.items.map((item) => <li key={item}><Item text={item} /></li>)}
                     </ul>
                   </li>
                 ))}
