@@ -1,4 +1,4 @@
--- easy-nav 데이터베이스 테이블 (워크북 3)
+-- easy-nav 데이터베이스 테이블 (워크북 3, route_cache의 excl_stn은 워크북 6에서 추가)
 -- Supabase의 SQL Editor에 통째로 붙여 넣고 Run을 누릅니다. 여러 번 실행해도 이미 있는 테이블은 건너뜁니다.
 
 -- 1) 역: 혼잡도 파일의 역번호가 기본키입니다. 9000번대는 지선·특수 승강장입니다(예: 9001 성수E).
@@ -24,15 +24,17 @@ create table if not exists congestion_stats (
 create index if not exists congestion_by_time on congestion_stats (day_type, time_slot);
 
 -- 3) 경로 응답 저장: 같은 조건으로 최단경로 API를 다시 부르지 않도록 응답을 그대로 저장합니다.
+--    excl_stn은 돌아가는 경로를 받을 때 피한 역입니다. 가장 빠른 경로는 빈칸('')입니다.
 create table if not exists route_cache (
   id           bigint generated always as identity primary key,
   dptre_stn    text        not null,
   arvl_stn     text        not null,
   search_dt    timestamp   not null,
   search_type  text        not null default 'duration',
+  excl_stn     text        not null default '',
   response     jsonb       not null,
   created_at   timestamptz not null default now(),
-  unique (dptre_stn, arvl_stn, search_dt, search_type)
+  constraint route_cache_condition_key unique (dptre_stn, arvl_stn, search_dt, search_type, excl_stn)
 );
 
 -- 바깥에서 Supabase 공개 주소로 표를 읽고 쓰지 못하게 막습니다. 우리 서버는 DATABASE_URL로 접속하므로 영향이 없습니다.

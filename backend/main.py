@@ -1,16 +1,14 @@
-"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 분석용 API (워크북 4·5)"""
+"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API (워크북 4~6)"""
 import os
 from datetime import datetime
 
 import psycopg
-import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
 
-from scripts.congestion_level import to_level
+from route_logic import avoid_candidates, describe_route, fetch_route, level_info, rank_routes
 
 load_dotenv()
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -18,7 +16,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 app = FastAPI(
     title="easy-nav API",
     description="빨리 갈까, 편하게 갈까? · 지하철 경로의 소요 시간과 혼잡도를 함께 계산합니다.",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 # 화면(Vercel)과 내 컴퓨터의 개발용 화면에서 이 서버를 부를 수 있게 허용합니다.
@@ -30,10 +28,6 @@ app.add_middleware(
 )
 
 DAY_TYPES = ("평일", "토요일", "일요일")
-# 최단경로 API의 방향 표기 → 혼잡도 표의 방향 표기
-DIRECTION = {"상행": "상선", "하행": "하선", "내선": "내선", "외선": "외선"}
-# 혼잡도 파일에서 번호가 따로 매겨진 곳 (워크북 2의 06번과 같음)
-SPECIAL = {("2호선", 211, "외선"): 9001}
 
 
 def db():
@@ -41,21 +35,9 @@ def db():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
-def level_info(percent):
-    level, name = to_level(percent)
-    return {"level": level, "level_name": name}
-
-
 def check_day_type(day_type):
     if day_type not in DAY_TYPES:
         raise HTTPException(400, "day_type은 평일, 토요일, 일요일 중 하나입니다.")
-
-
-def time_slot(clock):
-    """'08:47:30' → '8시30분' (30분 칸 이름)"""
-    hour, minute, _ = clock.split(":")
-    hour_text = "00" if int(hour) == 0 else str(int(hour))
-    return f"{hour_text}시{'30' if int(minute) >= 30 else '00'}분"
 
 
 @app.get("/", tags=["기본"], summary="서버 상태")
@@ -89,34 +71,6 @@ def station_congestion(station_no: int, direction: str = Query(..., description=
     return rows
 
 
-def fetch_route(conn, start, end, search_dt):
-    """최단경로 API로 경로를 받습니다. 같은 조건으로 받은 적이 있으면 저장해 둔 응답을 씁니다."""
-    key = (start, end, search_dt, "duration")
-    saved = conn.execute(
-        "select response from route_cache where dptre_stn = %s and arvl_stn = %s"
-        " and search_dt = %s and search_type = %s", key).fetchone()
-    if saved:
-        return saved["response"]
-    params = {
-        "serviceKey": os.environ["PUBLIC_DATA_API_KEY"],
-        "dataType": "JSON",
-        "dptreStn": start,
-        "arvlStn": end,
-        "searchDt": search_dt.strftime("%Y-%m-%d %H:%M:%S"),
-        "searchType": "duration",
-    }
-    try:
-        data = requests.get(os.environ["ROUTE_API_URL"], params=params, timeout=20).json()
-    except (requests.RequestException, ValueError):
-        raise HTTPException(502, "최단경로 API에 연결하지 못했습니다.")
-    if data.get("header", {}).get("resultCode") != "00":
-        raise HTTPException(502, f"최단경로 API 오류: {data.get('header')}")
-    conn.execute(
-        "insert into route_cache (dptre_stn, arvl_stn, search_dt, search_type, response)"
-        " values (%s, %s, %s, %s, %s) on conflict do nothing", (*key, Jsonb(data)))
-    return data
-
-
 @app.get("/routes/congestion", tags=["경로"], summary="경로 하나의 혼잡도")
 def route_congestion(from_station: str = Query(..., description="출발역 이름. 예: 신도림"),
                      to_station: str = Query(..., description="도착역 이름. 예: 강남"),
@@ -126,40 +80,48 @@ def route_congestion(from_station: str = Query(..., description="출발역 이�
     check_day_type(day_type)
     with db() as conn:
         route = fetch_route(conn, from_station, to_station, depart_time)["body"]
-        segments, missing = [], []
-        for seg in route["paths"]:
-            if seg["trsitYn"] == "Y":          # 환승 구간은 열차를 타지 않습니다.
-                continue
-            station = seg["dptreStn"]
-            direction = DIRECTION.get(seg["upbdnbSe"])
-            if not station["stnCd"].isdigit():     # 1~8호선 밖의 노선(역코드에 글자)은 혼잡도 자료가 없습니다.
-                missing.append(station["stnNm"])
-                continue
-            number = SPECIAL.get((station["lineNm"], int(station["stnCd"]), direction), int(station["stnCd"]))
-            slot = time_slot(seg["trainDptreTm"])
-            found = conn.execute(
-                "select congestion::float as congestion from congestion_stats where station_no = %s"
-                " and direction = %s and day_type = %s and time_slot = %s",
-                (number, direction, day_type, slot)).fetchone()
-            if not found:                      # 혼잡도 자료가 없거나 운행 없음(0)으로 뺀 칸
-                missing.append(station["stnNm"])
-                continue
-            segments.append({"station": station["stnNm"], "line": station["lineNm"], "direction": seg["upbdnbSe"],
-                             "time_slot": slot, "seconds": seg["reqHr"], "congestion": found["congestion"],
-                             **level_info(found["congestion"])})
-    if not segments:
+        info = describe_route(conn, route, day_type, depart_time)
+    if info is None:
         raise HTTPException(404, "이 경로에는 혼잡도를 붙일 수 있는 1~8호선 구간이 없습니다.")
-    total = sum(s["seconds"] for s in segments)
-    average = round(sum(s["congestion"] * s["seconds"] for s in segments) / total, 1)
-    worst = max(segments, key=lambda s: s["congestion"])
     return {
         "from": from_station, "to": to_station, "depart_time": depart_time, "day_type": day_type,
-        "total_minutes": round(route["totalReqHr"] / 60, 1),
-        "transfers": route["trsitNmtm"],
-        "average": {"congestion": average, **level_info(average)},
-        "worst": {"station": worst["station"], "congestion": worst["congestion"], **level_info(worst["congestion"])},
-        "segments": segments,
-        "missing": missing,
+        "total_minutes": info["total_minutes"], "transfers": info["transfers"],
+        "average": info["average"], "worst": info["worst"],
+        "segments": info["segments"], "missing": info["missing"],
+    }
+
+
+@app.get("/routes/recommend", tags=["경로"], summary="빠른 길과 편한 길 비교 추천")
+def recommend(from_station: str = Query(..., description="출발역 이름. 예: 잠실"),
+              to_station: str = Query(..., description="도착역 이름. 예: 광화문"),
+              depart_time: datetime = Query(..., description="출발 일시. 예: 2026-10-22T08:30"),
+              day_type: str = "평일",
+              time_weight: float = Query(0.5, ge=0, le=1, description="1에 가까울수록 시간을, 0에 가까울수록 덜 붐비는 것을 중시")):
+    """가장 빠른 길과, 붐비는 역을 피해 돌아가는 길을 최대 2개 더 받아 비교합니다.
+    후보마다 평균 혼잡도, 가장 붐비는 구간, 빠른 길과의 차이, 출발 시각을 앞뒤 1시간 옮겼을 때의 평균 혼잡도를 붙이고
+    시간 가중치로 점수를 매겨 추천 순서대로 돌려줍니다."""
+    check_day_type(day_type)
+    with db() as conn:
+        first = fetch_route(conn, from_station, to_station, depart_time)["body"]
+        fastest = describe_route(conn, first, day_type, depart_time)
+        if fastest is None:
+            raise HTTPException(404, "이 경로에는 혼잡도를 붙일 수 있는 1~8호선 구간이 없습니다.")
+        candidates = [{**fastest, "avoid": None}]
+        for name in avoid_candidates(conn, first, fastest, from_station, to_station):
+            try:
+                other = fetch_route(conn, from_station, to_station, depart_time, exclude=name)["body"]
+            except HTTPException:              # 그 역을 빼면 길이 없으면 건너뜁니다.
+                continue
+            info = describe_route(conn, other, day_type, depart_time)
+            if info and all(info["signature"] != c["signature"] for c in candidates):
+                candidates.append({**info, "avoid": name})
+    for c in candidates:
+        del c["signature"]
+    ranked = rank_routes(candidates, time_weight)
+    return {
+        "from": from_station, "to": to_station, "depart_time": depart_time, "day_type": day_type,
+        "time_weight": time_weight,
+        "candidates": ranked,
     }
 
 
