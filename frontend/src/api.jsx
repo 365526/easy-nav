@@ -5,12 +5,17 @@ import { useEffect, useState } from "react";
 export const API_URL = (import.meta.env.VITE_API_URL || "https://easy-nav-api.onrender.com").replace(/\/$/, "");
 
 // 서버에서 JSON을 받아 옵니다. 주소나 입력값이 바뀌면 다시 받습니다.
+// path에 null을 넣으면 아무것도 받지 않습니다. (예: 검색어를 아직 넣지 않았을 때)
 export function useApi(path, params = {}) {
   const query = new URLSearchParams(params).toString();
-  const url = `${API_URL}${path}${query ? `?${query}` : ""}`;
-  const [state, setState] = useState({ data: null, error: "", loading: true, slow: false });
+  const url = path ? `${API_URL}${path}${query ? `?${query}` : ""}` : null;
+  const [state, setState] = useState({ data: null, error: "", loading: Boolean(url), slow: false });
 
   useEffect(() => {
+    if (!url) {
+      setState({ data: null, error: "", loading: false, slow: false });
+      return;
+    }
     const ctrl = new AbortController();
     setState((s) => ({ ...s, error: "", loading: true, slow: false }));
     // 무료 서버는 잠들어 있으면 첫 응답까지 1분 정도 걸립니다. 4초가 넘으면 안내 문구를 보여 줍니다.
@@ -36,8 +41,8 @@ export function useApi(path, params = {}) {
   return state;
 }
 
-// 받아 오는 중이거나 실패했을 때 보여 줄 안내
-export function LoadState({ loading, slow, error }) {
+// 받아 오는 중이거나 실패했을 때 보여 줄 안내. slowText로 4초가 넘었을 때의 문구를 바꿀 수 있습니다.
+export function LoadState({ loading, slow, error, slowText = "서버를 깨우는 중입니다. 처음 한 번은 1분 정도 걸릴 수 있습니다." }) {
   if (error) {
     return (
       <p role="alert" className="rounded-xl border border-[#FF2E97]/60 bg-[#FF2E97]/10 px-4 py-3 text-[15px] leading-relaxed">
@@ -54,7 +59,7 @@ export function LoadState({ loading, slow, error }) {
         {slow && (
           <>
             <br />
-            서버를 깨우는 중입니다. 처음 한 번은 1분 정도 걸릴 수 있습니다.
+            {slowText}
           </>
         )}
       </p>
