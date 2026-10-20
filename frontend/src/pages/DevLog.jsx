@@ -1,4 +1,7 @@
+import { Fragment } from "react";
+import { Link } from "react-router-dom";
 import { DEVLOG } from "../data/devlog.js";
+import { ROLES } from "../data/roles.js";
 import Phrases from "../components/Phrases.jsx";
 
 // GitHub 저장소 주소: 기록에 pr 번호가 있으면 Pull Request 링크를 붙입니다.
@@ -6,6 +9,15 @@ import Phrases from "../components/Phrases.jsx";
 const REPO = "https://github.com/365526/easy-nav";
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 const dayName = (date) => WEEKDAY[new Date(`${date}T00:00:00`).getDay()];
+
+// 기록 문장 속 "자료 조사 담당자"처럼 쓴 말에 그 역할의 색을 입힙니다(roles.js의 word + " 담당자").
+const ROLE_COLOR = Object.fromEntries(ROLES.map((r) => [`${r.word} 담당자`, r.color]));
+const ROLE_WORD = new RegExp(`(${ROLES.map((r) => `${r.word} 담당자`).join("|")})`);
+function Roles({ text }) {
+  return text.split(ROLE_WORD).map((part, i) =>
+    i % 2 ? <b key={i} style={{ color: ROLE_COLOR[part] }}>{part}</b> : part,
+  );
+}
 
 // 기록 문장 속 {#FF2E97}처럼 쓴 색 코드는 작은 색상표 네모와 코드로 보여 줍니다.
 function Item({ text }) {
@@ -16,8 +28,33 @@ function Item({ text }) {
         <code className="text-[14px] text-[#F2F4FF]">{part}</code>
       </span>
     ) : (
-      part
+      <Fragment key={i}><Roles text={part} /></Fragment>
     ),
+  );
+}
+
+// 맨 위 역할 배지: 휴대폰처럼 좁은 화면에서는 네 칸 한 줄에 줄임 이름(short)으로(380px보다 좁으면 글자를 조금 더 작게),
+//  sm(640px) 이상에서는 점과 함께 전체 이름(title)으로, "역할 소개 보기 →"까지 한 줄에 보여 줍니다.
+function RoleBadges() {
+  return (
+    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+      <ul className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+        {ROLES.map((r) => (
+          <li
+            key={r.title}
+            className="flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full py-1 text-[12px] font-bold min-[380px]:text-[13px] sm:px-3 sm:text-[14px]"
+            style={{ color: r.color, boxShadow: `inset 0 0 0 1.5px ${r.color}`, background: `${r.color}1A` }}
+          >
+            <span aria-hidden="true" className="hidden h-2 w-2 rounded-full sm:inline-block" style={{ background: r.color }} />
+            <span className="sm:hidden">{r.short}</span>
+            <span className="hidden sm:inline">{r.title}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-right">
+        <Link to="/team" className="text-[14px] font-bold text-[#22E5FF] underline-offset-4 hover:underline">역할 소개 보기 →</Link>
+      </p>
+    </div>
   );
 }
 
@@ -41,6 +78,10 @@ export default function DevLog() {
       <section>
         <p className="text-[15px] font-bold tracking-[.14em] text-[#22E5FF]">개발 기록</p>
         <h1 className="mt-2 text-[32px] font-black leading-tight md:text-[44px]"><Phrases text="어디까지/만들었을까" /></h1>
+        <p className="mt-4 max-w-[720px] text-[17px] leading-relaxed text-[#A9A6D6]">
+          개발은 시스템 구현 담당이 진행했고, 다른 역할의 일은 이름에 색을 넣어 표시했습니다.
+        </p>
+        <RoleBadges />
       </section>
       <ol className="relative flex flex-col gap-10 border-l-2 border-[#2C2366] pl-6">
         {groups.map((group, gi) => {
