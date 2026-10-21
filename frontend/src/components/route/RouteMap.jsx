@@ -117,10 +117,14 @@ export default function RouteMap({ onPick }) {
     setPicked(name);
   }
 
+  // 보이는 정도: 역 사이 한 칸이 화면에서 몇 px인지(ppu)로 세 단계. 호선을 고르면 그 노선은 늘 자세히
+  //  0 축소(14px 미만): 노선과 환승역 점만, 이름 없음 · 1 중간(28px 미만): 모든 역 점 + 환승역 이름 · 2 확대: 모든 역 점과 이름
+  const ppu = 1 / k;
+  const lod = line ? 2 : ppu < 14 ? 0 : ppu < 28 ? 1 : 2;
+
   // 역 이름: 겹치지 않는 것만 보여 줌 (고른 역 → 환승역 → 나머지 순서)
   const fsU = 12.5 * k; // 글자 크기 (칸)
-  const showAll = line || v.w < full.w * 0.55;
-  const want = MAP.stations.filter((s) => (line ? s.lines.includes(line) : s.lines.length > 1 || showAll));
+  const want = lod === 0 ? [] : MAP.stations.filter((s) => (line ? s.lines.includes(line) : s.lines.length > 1 || lod === 2));
   want.sort((a, b) => (b.name === picked) - (a.name === picked) || b.lines.length - a.lines.length);
   const boxes = [];
   const labels = [];
@@ -136,7 +140,7 @@ export default function RouteMap({ onPick }) {
   }
 
   const dim = (ls) => (line && !ls.includes(line) ? 0.14 : 1);
-  const lw = 6 * k;
+  const lw = (lod === 0 ? 4.5 : 6) * k; // 축소 단계는 선을 조금 가늘게
   const pickedSt = picked && MAP.stations.find((s) => s.name === picked);
   const popX = pickedSt && Math.min(Math.max((pickedSt.x - v.x) / k, 110), size.w - 110);
   const popY = pickedSt && (pickedSt.y - v.y) / k;
@@ -174,7 +178,16 @@ export default function RouteMap({ onPick }) {
           onPointerUp={up}
           onPointerCancel={up}
           onPointerLeave={up}
-          onClick={(e) => e.target === svg.current && !moved.current && setPicked(null)}
+          onClick={(e) => {
+            if (moved.current) return;
+            // 축소 단계: 점이 작아 역을 정확히 누르기 어려우므로, 누른 곳을 중심으로 중간 단계(한 칸 20px)까지 확대
+            if (lod === 0) {
+              const [cx, cy] = toMap(e);
+              zoomAt(size.w / 20 / v.w, cx, cy);
+              return;
+            }
+            if (e.target === svg.current) setPicked(null);
+          }}
         >
           <defs>
             {line &&
@@ -228,26 +241,30 @@ export default function RouteMap({ onPick }) {
               <polyline key={i} points={t.pts.join(" ")} fill="none" stroke={`url(#tail${i})`} strokeWidth={lw * 1.2} strokeLinecap="round" strokeLinejoin="round" />
             ))}
 
-          {/* 역: 환승역은 큰 흰 동그라미. 누르기 쉽게 투명한 원을 겹침(옆 역과 겹치지 않을 만큼만 크게) */}
+          {/* 역: 환승역은 흰 동그라미. 누르기 쉽게 투명한 원을 겹침(옆 역과 겹치지 않을 만큼만 크게)
+              축소 단계는 환승역 점만 작게 그리고 누를 수 없음(누르면 확대) · 중간 단계는 점을 조금 작게 */}
           {MAP.stations.map((s) => {
             const tr = s.lines.length > 1;
+            if (lod === 0 && !tr) return null;
             const op = dim(s.lines);
+            const live = lod > 0 && op === 1; // 누를 수 있는 역
+            const r = lod === 0 ? 4.5 : lod === 1 ? (tr ? 5.5 : 2.8) : tr ? 6.5 : 3.8;
             return (
               <g
                 key={s.name}
                 role="button"
-                tabIndex={op === 1 ? 0 : -1}
+                tabIndex={live ? 0 : -1}
                 aria-label={`${s.name}역 (${s.lines.join("·")})`}
-                onClick={() => op === 1 && choose(s.name)}
-                onKeyDown={(e) => e.key === "Enter" && op === 1 && setPicked(s.name)}
-                className={op === 1 ? "cursor-pointer outline-none" : "pointer-events-none"}
+                onClick={() => live && choose(s.name)}
+                onKeyDown={(e) => e.key === "Enter" && live && setPicked(s.name)}
+                className={live ? "cursor-pointer outline-none" : "pointer-events-none"}
                 opacity={op}
               >
                 <circle cx={s.x} cy={s.y} r={Math.min(14 * k, 0.45)} fill="transparent" />
                 {tr ? (
-                  <circle cx={s.x} cy={s.y} r={6.5 * k} fill="#F2F4FF" stroke="#0A0B1E" strokeWidth={2.5 * k} />
+                  <circle cx={s.x} cy={s.y} r={r * k} fill="#F2F4FF" stroke="#0A0B1E" strokeWidth={(lod === 2 ? 2.5 : 2) * k} />
                 ) : (
-                  <circle cx={s.x} cy={s.y} r={3.8 * k} fill="#0A0B1E" stroke="#F2F4FF" strokeWidth={1.8 * k} />
+                  <circle cx={s.x} cy={s.y} r={r * k} fill="#0A0B1E" stroke="#F2F4FF" strokeWidth={(lod === 2 ? 1.8 : 1.4) * k} />
                 )}
               </g>
             );
@@ -316,7 +333,7 @@ export default function RouteMap({ onPick }) {
       </div>
 
       <p className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-[12px] text-[#6E6A9E]">
-        <span>역을 누르면 출발역·도착역으로 고를 수 있어요 · 끌어서 이동, 휠·두 손가락으로 확대</span>
+        <span>{lod === 0 ? "누르거나 확대하면 역 이름이 보여요" : "역을 누르면 출발역·도착역으로 고를 수 있어요"} · 끌어서 이동, 휠·두 손가락으로 확대</span>
         <span>{MAP.source}</span>
       </p>
     </section>

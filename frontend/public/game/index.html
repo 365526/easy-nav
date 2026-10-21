@@ -1175,7 +1175,11 @@ const apiDb={collection:()=>({doc:id=>({set:d=>fetch(SCORE_API+"/crossy",{method
 // 점수 공유: 휴대폰은 기본 공유 창, 없으면 문구와 링크를 복사
 $("shareBtn").addEventListener("click",async()=>{
   const base=!window.claude&&/^https?:$/.test(location.protocol)?location.origin:SITE_URL, url=base+"/game";
-  const text=`CROSSY METRO에서 ${G.score}역까지 갔어요! 혼잡한 칸을 피해 당신은 몇 역까지 갈 수 있을까요?`;
+  // 공유 문구(SHARE_NICK): 명예의 전당에 남긴 닉네임이 있으면 "○○님의", 기록은 이번 판과 이 기기 최고 기록 중 높은 쪽
+  let nick=""; try{ nick=localStorage.getItem("easynav-nick")||""; }catch(e){}
+  if(nickProblem(nick)) nick="";
+  const top=Math.max(best,G.score);
+  const text=(nick?`${nick}님의 CROSSY METRO 최고 기록은 ${top}역이에요.`:`CROSSY METRO 최고 기록 ${top}역!`)+" 혼잡한 칸을 피해 당신은 몇 역까지 건널 수 있을까요?";
   const note=$("shareNote"); note.textContent="";
   if(navigator.share){ try{ await navigator.share({title:"CROSSY METRO: Fast or Comfy?",text,url}); return; }catch(err){ if(err&&err.name==="AbortError") return; } }
   try{ await navigator.clipboard.writeText(text+"\n"+url); note.textContent="공유 문구와 링크를 복사했어요."; }catch(err){ note.textContent=url; }
