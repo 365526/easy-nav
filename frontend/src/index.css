@@ -138,3 +138,9 @@ input.tradeoff:focus-visible {
     animation: none;
   }
 }
+/* 쇼릴: 복셀(픽셀) 그림 옆에서 슬로건이 가늘어 보이지 않게, reel-thick을 붙인 슬로건('숨 막히는'·'직접 고르세요' 장면)에만 같은 색 외곽선을 한 겹 더함
+   (첫 화면 질문·서비스 이름·'해결책은' 장면처럼 빛 번짐이나 그라데이션이 있는 글씨에 넣으면 받침과 획 사이가 메워져 뭉개짐) */
+.reel-art .reel-thick {
+  -webkit-text-stroke: 1.6px currentColor;
+  paint-order: stroke fill;
+}

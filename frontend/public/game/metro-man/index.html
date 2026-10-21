@@ -1,0 +1,1220 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<!-- 공유 링크 미리보기 -->
+<meta name="description" content="혼잡한 열차를 피해 이동해 보자! 「빨리 갈까, 편하게 갈까?」 체험용 게임. 노선도를 달려 목적지까지 가 보세요.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:site_name" content="빨리 갈까, 편하게 갈까?">
+<meta property="og:url" content="https://easy-nav-iota.vercel.app/game/metro-man">
+<meta property="og:title" content="METRO-MAN: Fast or Comfy?">
+<meta property="og:description" content="혼잡한 열차를 피해 이동해 보자! 「빨리 갈까, 편하게 갈까?」 체험용 게임. 노선도를 달려 목적지까지 가 보세요.">
+<meta property="og:image" content="https://easy-nav-iota.vercel.app/og-metro-man.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<title>METRO-MAN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Press+Start+2P&display=swap">
+<style>
+/* 화면 규칙(혼잡 열차 피하기 게임과 같음): 한 화면에 [제목·버튼] [상태 칩] [게임 화면] [조작 버튼(휴대폰)] [AI 안내]가 같은 폭으로 쌓이고,
+   METRO-MAN: CROSSY METRO와 같은 화면 틀. 노선도가 남는 높이를 꽉 채움. 컴퓨터는 16:9 가로 화면, 휴대폰은 세로 화면. 휴대폰을 가로로 들면 세로로 돌려 달라고 안내 */
+:root{
+  --bg:#0A0B1E; --bg2:#120E2E; --line:#2C2366; --fg:#F2F4FF; --sub:#A9A6D6;
+  --cyan:#22E5FF; --pink:#FF2E97; --green:#39FFB0; --red:#FF3B5C; --purple:#9B5CFF;
+  --l1:#8FBCE6; --l5:#B23A12;   /* 서비스 혼잡도 1단계 여유 · 5단계 매우 혼잡 */
+  --sans:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --pixel:"Press Start 2P",var(--sans);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;background:var(--bg);color:var(--fg)}
+body{font-family:var(--sans);word-break:keep-all;-webkit-tap-highlight-color:transparent;display:flex;justify-content:center;align-items:flex-start;
+  padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow:hidden}
+.wrap{width:100%;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{margin:0;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;font-family:var(--pixel);font-weight:400}
+h1 .t{font-size:clamp(16px,2.6vw,24px);text-shadow:3px 3px 0 #1E2A5A}
+h1 .s{font-size:clamp(9px,1.2vw,12px);color:var(--sub)}
+h1 .a{color:var(--pink)} h1 .b{color:var(--green)}
+.btns{display:flex;gap:8px}
+.chip{border:1px solid var(--line);background:var(--bg2);border-radius:999px;padding:6px 14px;font-size:14px;font-weight:700;white-space:nowrap;color:var(--fg);display:inline-flex;align-items:center;gap:8px}
+button.chip{font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+button.chip:hover{border-color:var(--cyan)}
+button:focus-visible,.stage:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.hud{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-variant-numeric:tabular-nums}
+.hud .grow{flex:1;min-width:0}
+.hearts{letter-spacing:2px}
+.combo i{display:inline-block;width:7px;height:13px;border-radius:2px;background:var(--line);margin-left:2px}
+.combo i.on{background:var(--l1);box-shadow:0 0 6px var(--l1)}
+.combo.pop{animation:pop .45s}
+@keyframes pop{35%{transform:scale(1.12)}}
+.station{overflow:hidden;text-overflow:ellipsis}
+.station small{color:var(--sub);font-weight:400}
+.num{font-family:var(--pixel);font-size:12px;color:var(--cyan)}
+.gapbar{display:inline-block;width:64px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.gapbar i{display:block;height:100%;width:100%;background:var(--cyan);transform-origin:left}
+.gapchip.low .gapbar i{background:var(--red)}
+.gapchip.low{border-color:var(--red)}
+.hud .ico{display:none}
+
+.stage{position:relative;margin:0 auto;border-radius:20px;overflow:hidden;box-shadow:0 0 0 1px var(--line),0 0 40px #7A5CFF22;background:#05060D;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage:focus{outline:none}
+canvas{display:block;width:100%;height:100%}
+.keyhint{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:2;font:inherit;font-size:13px;font-weight:700;background:rgba(10,11,30,.92);color:var(--cyan);border:1px solid var(--cyan);border-radius:999px;padding:6px 14px;cursor:pointer;white-space:nowrap}
+
+.pad{display:none;grid-template-columns:1fr 1.3fr 1.3fr 1fr;gap:8px}
+.pad button{min-height:52px;font:inherit;font-size:17px;font-weight:900;border-radius:16px;background:var(--bg2);color:var(--fg);border:1px solid var(--line);cursor:pointer;touch-action:manipulation}
+.pad .up{border-color:var(--l1);color:var(--l1)}
+.pad .jump{border-color:var(--cyan);color:var(--cyan)}
+.pad button:active{transform:translateY(2px);background:#1A1545}
+.touch .pad{display:grid}
+
+.guide{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
+.bot{flex:none;width:56px;display:block}
+.bot svg{display:block;width:100%;height:auto}
+.bubble{position:relative;border:2px solid var(--cyan);border-radius:4px;box-shadow:0 0 12px rgba(34,229,255,.3);background:var(--bg2);padding:7px 12px;min-width:0;display:flex;gap:10px;align-items:baseline}
+.bubble.err{border-color:var(--pink);box-shadow:0 0 12px rgba(255,46,151,.3)}
+.bubble::before{content:"";position:absolute;left:-7px;top:50%;width:8px;height:8px;background:var(--bg2);border-left:2px solid;border-bottom:2px solid;border-color:inherit;transform:translateY(-50%) rotate(45deg)}
+.bubble .tag{flex:none;display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub)}
+.bubble .tag::before{content:"";width:6px;height:6px;background:var(--pink)}
+.bubble .msg{margin:0;font-size:14px;line-height:1.45;min-width:0}
+.bubble .msg b{color:var(--green)}
+.bubble .msg b.p{color:var(--pink)}
+.lv{display:inline-block;border-radius:999px;padding:0 7px;font-weight:900;font-size:.92em;line-height:1.5;white-space:nowrap}
+.lv.l1{background:var(--l1);color:#0A0B1E}
+.lv.l5{background:var(--l5);color:var(--fg)}
+
+/* 설명서·결과 창 (시안 6 설명서 · 시안 8 결과와 명예의 전당) */
+.overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 16px;background:rgba(6,6,20,.86);backdrop-filter:blur(4px)}
+.card{margin:auto;width:100%;max-width:880px;background:var(--bg2);border:1px solid var(--line);border-radius:22px;box-shadow:0 0 50px #7A5CFF33;padding:26px 30px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+.logo{display:flex;flex-direction:column;align-items:center;gap:10px;font-family:var(--pixel);font-weight:400}
+.logo .t{font-size:26px;text-shadow:3px 3px 0 #1E2A5A}
+.logo .s{font-size:11px;color:var(--sub)}
+.a{color:var(--pink)} .b{color:var(--green)}
+.mgrid{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;text-align:left}
+.mc{display:flex;gap:14px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg);border:1px solid var(--line);min-width:0}
+.mc .ic{flex:none;width:60px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.mc .tx{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pill{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;padding:1px 10px;border-radius:999px;font-size:14px;font-weight:900;white-space:nowrap;line-height:1.6}
+.ttl{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:900}
+.ttl .pill{align-self:auto}
+.mc .d{font-size:13.5px;line-height:1.5;color:#D6D4F2}
+.mc .d b{color:#FF6F88}
+.combo8{font-family:var(--pixel);font-size:9px;color:var(--cyan);text-shadow:0 0 8px rgba(34,229,255,.7);white-space:nowrap}
+.keys{display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:14px;color:var(--sub)}
+.keys>span{display:flex;gap:6px;align-items:center}
+kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;font-weight:900}
+.padhint{display:none;width:100%;flex-direction:column;gap:6px}
+.padhint .row{display:grid;grid-template-columns:1fr 1.3fr 1.3fr 1fr;gap:6px}
+.padhint .row span{padding:6px 0;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13px;font-weight:900}
+.padhint .row .u{border-color:var(--l1);color:var(--l1)} .padhint .row .j{border-color:var(--cyan);color:var(--cyan)}
+.padhint p{margin:0;font-size:11.5px;color:var(--sub)}
+.touch .keys{display:none} .touch .padhint{display:flex}
+.btn{min-height:48px;padding:0 30px;border-radius:999px;border:0;font:inherit;font-size:17px;font-weight:900;cursor:pointer;color:var(--bg);background:linear-gradient(90deg,var(--green),var(--cyan));box-shadow:0 0 22px #22E5FF66}
+.btn:focus-visible,.lk:focus-visible,.other:focus-visible,.share:focus-visible{outline:3px solid var(--fg);outline-offset:3px}
+.start{min-height:52px;padding:0 44px;font-size:18px}
+.backlink{margin-top:-8px;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;color:var(--sub);font-size:13px;font-weight:700;text-decoration:none}
+.backlink:hover{color:var(--fg)}
+/* 결과 */
+.res{max-width:900px;align-items:stretch;text-align:left}
+.rhead{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.rhead .l{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rtitle{margin:0;font-size:15px;font-weight:700;color:var(--sub)}
+.rscore{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.big{font-family:var(--pixel);font-size:44px;line-height:1.1;color:var(--cyan);text-shadow:4px 4px 0 #1E2A5A}
+.rmeta{font-size:15px;color:var(--sub)}
+.share{flex:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border-radius:999px;border:0;background:var(--cyan);color:var(--bg);font:inherit;font-size:15px;font-weight:900;cursor:pointer}
+.share-note{margin:-8px 0 0;font-size:13px;color:var(--cyan);white-space:pre-line;text-align:right}
+.share-note:empty{display:none}
+.rgrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
+.board{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.bh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.bh b{font-size:16px;font-weight:900} .bh span{font-size:12px;color:var(--sub)}
+.save{display:flex;gap:8px}
+.save input{flex:1;min-width:0;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--bg2);color:var(--fg);font:inherit;font-size:16px}
+.save input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.save button{flex:none;min-height:42px;padding:0 18px;border-radius:999px;border:0;background:linear-gradient(90deg,var(--green),var(--cyan));color:var(--bg);font:inherit;font-size:14px;font-weight:900;cursor:pointer;white-space:nowrap}
+.save-note{margin:0;font-size:13px;color:var(--sub)} .save-note:empty{display:none}
+.board ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.board li{display:grid;grid-template-columns:28px minmax(0,1fr) 54px 64px;gap:10px;align-items:center;padding:6px 8px;border-radius:10px;font-size:14px}
+.board li .rk{font-weight:900;text-align:center;color:var(--sub)}
+.board li:nth-child(1) .rk{color:#FFD84A}.board li:nth-child(2) .rk{color:#D9E2EE}.board li:nth-child(3) .rk{color:#E0A070}
+.board li .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board li .st{font-weight:900;color:var(--cyan);text-align:right}
+.board li .tm{color:var(--sub);text-align:right}
+.board li.me{background:rgba(255,46,151,.15)}
+.bnote{margin:0;font-size:12px;color:var(--sub)}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pitch{padding:14px 16px;border-radius:14px;background:linear-gradient(90deg,rgba(255,46,151,.08),rgba(57,255,176,.1));box-shadow:inset 0 0 0 1px var(--line);font-size:14px;line-height:1.6}
+.pitch b{display:block;font-size:18px;font-weight:900}
+.again{width:100%;min-height:50px}
+.links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.lk{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);font-size:14px;font-weight:900;color:var(--fg);text-decoration:none;white-space:nowrap}
+.lk:hover,.other:hover{box-shadow:inset 0 0 0 1px var(--cyan)}
+.lk.otherm{display:none}
+.other{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);color:var(--fg);text-decoration:none}
+.other .ot{flex:1;display:flex;flex-direction:column;min-width:0}
+.other small{font-size:12px;color:var(--sub)} .other b{font-size:14px;font-weight:900}
+.other .go{font-size:18px;color:var(--sub)}
+#rotate{display:none;position:fixed;inset:0;z-index:100;background:var(--bg);align-items:center;justify-content:center;text-align:center;padding:16px}
+#rotate div{display:flex;flex-direction:column;gap:8px;align-items:center}
+#rotate span{font-size:40px}#rotate b{font-size:20px}#rotate p{margin:0;color:var(--sub);font-size:14px}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:540px){#rotate{display:flex}}
+
+@media (max-width:820px){.manual{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){
+  body{padding-block:10px}
+  .wrap{gap:8px}
+  .top{gap:8px}
+  h1{gap:8px}
+  .btns{display:grid;grid-template-columns:repeat(4,1fr);width:100%;gap:6px}
+  .btns .chip{justify-content:center;padding:6px 2px;font-size:12px}
+  .hud{gap:6px}
+  .chip{padding:5px 10px;font-size:13px}
+  .hud{flex-wrap:nowrap}
+  .hud .station,.hud .bestchip{display:none}
+  .hud .chip{padding:4px 8px;font-size:12px;gap:5px}
+  .hearts{letter-spacing:0}
+  .combo i{width:5px;height:11px}
+  .gapbar{width:34px}
+  .hud .lbl{display:none}
+  .hud .ico{display:inline}
+  .overlay{padding:10px}
+  .card{padding:16px 12px;gap:12px;border-radius:20px}
+  .logo{gap:7px} .logo .t{font-size:18px;text-shadow:2px 2px 0 #1E2A5A} .logo .s{font-size:9px}
+  .mgrid{grid-template-columns:minmax(0,1fr);gap:5px}
+  .mc{gap:10px;padding:8px 10px;border-radius:12px}
+  .mc .ic{width:44px;gap:3px} .mc.m-noic .ic{display:none}
+  .mc .tx{gap:2px} .pill{font-size:12.5px;padding:0 8px} .ttl{font-size:12.5px;gap:5px}
+  .mc .d{font-size:12px;line-height:1.45}
+  .combo8{font-size:6.5px}
+  .start{width:70%;min-height:46px;font-size:17px;padding:0}
+  .rhead{flex-direction:column;align-items:center;text-align:center;gap:6px}
+  .rhead .l{align-items:center;gap:6px}
+  .rtitle{font-size:13px} .rscore{flex-direction:column;align-items:center;gap:6px}
+  .big{font-size:32px;text-shadow:3px 3px 0 #1E2A5A} .rmeta{font-size:12.5px}
+  .share{min-height:40px;font-size:14px;padding:0 16px} .share-note{text-align:center;margin:0}
+  .rgrid{display:flex;flex-direction:column;gap:12px}
+  .board{padding:10px;gap:8px;border-radius:12px} .bh b{font-size:14px} .bh span{font-size:11px}
+  .save input,.save button{min-height:38px;font-size:13px} .save input{font-size:16px;padding:0 12px} .save button{padding:0 14px}
+  .board li{grid-template-columns:22px minmax(0,1fr) 44px 40px;gap:6px;padding:4px 6px;font-size:13px;border-radius:8px}
+  .pitch{padding:10px 12px;font-size:12.5px;line-height:1.55;text-align:center;border-radius:12px} .pitch b{font-size:16px} .pitch .pc{display:none}
+  .again{min-height:46px;font-size:16px}
+  .links{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px} .lk{min-height:42px;font-size:12.5px} .lk.otherm{display:flex} .other{display:none}
+  .bnote{display:none}
+  .bot{width:44px}
+  .bubble{flex-direction:column;gap:2px;padding:6px 10px}
+  .bubble .msg{font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){.combo.pop{animation:none}}
+
+/* METRO-MAN 전용 */
+#cv{display:block;width:100%;height:auto}
+.stage{background:radial-gradient(ellipse at 50% 0%,#17123F,#0A0B1E 75%)}
+.hud .goalchip small{color:var(--sub);font-weight:400}
+.timebar{display:inline-block;width:64px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.timebar i{display:block;height:100%;width:100%;background:var(--cyan);transform-origin:left}
+.timechip.low{border-color:var(--red)} .timechip.low .timebar i{background:var(--red)} .timechip.low .num{color:var(--red)}
+.rule{width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:13px;color:#D6D4F2;line-height:1.6}
+.rule b{color:var(--fg)}
+.rule dl{display:grid;grid-template-columns:auto 1fr;gap:0 10px;margin:4px 0 0}
+.rule dt{font-weight:900;color:var(--fg);white-space:nowrap} .rule dd{margin:0}
+.diff{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center}
+.diff>span{font-size:14px;font-weight:700;color:var(--sub)}
+.diff button{min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.diff button[aria-pressed="true"]{border-color:var(--cyan);background:#22E5FF22;box-shadow:0 0 14px #22E5FF55}
+.tapfx{position:fixed;z-index:60;pointer-events:none;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:900;color:#0A0B1E;background:#22E5FFcc;box-shadow:0 0 24px #22E5FF;animation:tapfx .35s ease-out forwards}
+@keyframes tapfx{from{opacity:.95;transform:scale(.7)}to{opacity:0;transform:scale(1.15)}}
+@media (max-width:560px){
+  .hud .goalchip{display:none}
+  .timebar{width:40px}
+  .rule{font-size:11.5px;padding:8px 10px;line-height:1.5}
+  .diff{flex-wrap:nowrap;gap:6px} .diff>span{font-size:12.5px;white-space:nowrap} .diff button{padding:0 10px;font-size:13px;min-height:36px}
+}
+.lv.l1g{background:var(--green);color:#0A0B1E}
+</style>
+</head>
+<body>
+
+<div id="rotate" role="alert"><div><span aria-hidden="true">📱↺</span><b>휴대폰을 세로로 돌려 주세요</b><p>이 게임은 휴대폰 세로 화면에서 즐길 수 있어요.</p></div></div>
+
+<div class="wrap" id="wrap">
+  <div class="top" id="top">
+    <h1><span class="t">METRO-MAN</span><span class="s"><span class="a">Fast</span> or <span class="b">Comfy</span>?</span></h1>
+    <div class="btns">
+      <button class="chip" id="muteBtn" type="button" aria-pressed="false">🔊 소리 끄기</button>
+      <button class="chip" id="pauseBtn" type="button" aria-pressed="false">⏸ 일시 정지</button>
+      <button class="chip" id="homeBtn" type="button">⏮ 처음부터</button>
+      <button class="chip" id="helpBtn" type="button">사용 설명서</button>
+    </div>
+  </div>
+
+  <div class="hud" id="hud">
+    <span class="chip hearts" id="hearts" aria-label="남은 하트">💚💚💚</span>
+    <span class="chip">단계 <span class="num" id="level">1</span></span>
+    <span class="chip timechip" id="timeChip"><span class="lbl">남은 시간</span><span class="ico" aria-hidden="true">⏱</span> <span class="timebar"><i id="timeBar"></i></span> <span class="num" id="timeNum">45</span></span>
+    <span class="chip goalchip grow" id="goalChip">목적지까지 <small>출발 전</small></span>
+    <span class="chip"><span class="lbl">점수</span><span class="ico" aria-hidden="true">★</span> <span class="num" id="score">0</span></span>
+    <span class="chip bestchip">최고 <span class="num" id="best">0</span></span>
+  </div>
+
+  <div class="stage" id="stage" tabindex="0" aria-label="게임 화면 (방향키로 조작)">
+    <canvas id="cv" width="960" height="560" aria-label="METRO-MAN 게임 화면: 노선도 위에서 혼잡한 열차를 피해 목적지역으로 이동하는 게임"></canvas>
+  </div>
+
+  <div class="guide" id="guide">
+    <span class="bot" id="face" aria-hidden="true"></span>
+    <div class="bubble" id="bubble" aria-live="polite">
+      <span class="tag">AI 안내 도우미</span>
+      <p class="msg" id="msg">혼잡 열차를 피해 <b>목적지</b>까지 가장 짧은 길로 가요.</p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="intro" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+  <div class="card">
+    <div class="logo" id="introTitle"><span class="t">METRO-MAN</span><span class="s"><span class="a">Fast</span> or <span class="b">Comfy</span>?</span></div>
+    <div class="mgrid">
+      <div class="mc"><span class="ic" data-icon="hero"></span><div class="tx"><span class="pill" style="background:#FF2E97;color:#0A0B1E">나</span><span class="d">혼잡한 열차를 피해 목적지에 가야 해요.<br>시작할 때 분홍 빛이 내려와 위치를 알려 줘요.</span></div></div>
+      <div class="mc"><span class="ic"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><ellipse cx="14" cy="38" rx="12" ry="4" fill="#39FFB0" opacity=".45"/><circle cx="14" cy="34" r="9" fill="none" stroke="#F2F4FF" stroke-width="2"/><rect x="12" y="4" width="4" height="32" fill="#F2F4FF"/><rect x="16" y="6" width="22" height="13" fill="#39FFB0"/><rect x="16" y="6" width="7" height="6" fill="#0A0B1E" opacity=".25"/><rect x="30" y="13" width="8" height="6" fill="#0A0B1E" opacity=".25"/></svg></span><div class="tx"><span class="pill" style="background:#39FFB0;color:#0A0B1E">목적지</span><span class="d">빛 고리가 있는 역이에요.<br>닿으면 다음 단계로 넘어가요.</span></div></div>
+      <div class="mc m-noic"><span class="ic"><svg width="60" height="30" viewBox="0 0 120 56" aria-hidden="true"><rect x="6" y="40" width="96" height="8" rx="3" fill="#0A0B1E" opacity=".55"/><defs><linearGradient id="t5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E37A50"/><stop offset=".55" stop-color="#C2552B"/><stop offset="1" stop-color="#7E2A0E"/></linearGradient></defs><rect x="6" y="8" width="96" height="40" rx="9" fill="url(#t5)" stroke="#6A220B" stroke-width="2"/><rect x="9" y="42" width="90" height="3" fill="#22E5FF"/><rect x="14" y="15" width="14" height="26" rx="2" fill="#E8916C"/><rect x="90" y="14" width="7" height="28" rx="3" fill="#1A0A08"/><rect x="27" y="21" width="54" height="14" rx="7" fill="#0A0B1E"/><circle cx="34" cy="28" r="3" fill="#FF8A5C"/><circle cx="44" cy="28" r="3" fill="#FF8A5C"/><circle cx="54" cy="28" r="3" fill="#FF8A5C"/><circle cx="64" cy="28" r="3" fill="#FF8A5C"/><circle cx="74" cy="28" r="3" fill="#FF8A5C"/></svg></span><div class="tx"><span class="ttl">지하철 <span class="pill" style="background:#B23A12;color:#F2F4FF">5단계 매우 혼잡</span></span><span class="d">부딪히면 <b>하트 −1</b> · 점수 −100.<br>단계가 오를수록 늘어나고 빨라져요.</span></div></div>
+      <div class="mc m-noic"><span class="ic"><svg width="60" height="30" viewBox="0 0 120 56" aria-hidden="true"><rect x="6" y="40" width="96" height="8" rx="3" fill="#0A0B1E" opacity=".55"/><defs><linearGradient id="t1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3EFFA"/><stop offset=".55" stop-color="#BCD7EF"/><stop offset="1" stop-color="#7FA8CF"/></linearGradient></defs><rect x="6" y="8" width="96" height="40" rx="9" fill="url(#t1)" stroke="#5F89B0" stroke-width="2"/><rect x="9" y="42" width="90" height="3" fill="#22E5FF"/><rect x="14" y="15" width="14" height="26" rx="2" fill="#F4F9FF"/><rect x="90" y="14" width="7" height="28" rx="3" fill="#0A0F22"/><rect x="27" y="21" width="54" height="14" rx="7" fill="#0A0B1E"/><circle cx="34" cy="28" r="3" fill="#8FBCE6"/><circle cx="44" cy="28" r="3" fill="#8FBCE6" opacity=".28"/><circle cx="54" cy="28" r="3" fill="#8FBCE6" opacity=".28"/><circle cx="64" cy="28" r="3" fill="#8FBCE6" opacity=".28"/><circle cx="74" cy="28" r="3" fill="#8FBCE6" opacity=".28"/></svg></span><div class="tx"><span class="pill" style="background:#39FFB0;color:#0A0B1E">여유</span><span class="d">지나가면 5초 동안 혼잡 열차가<br><span class="pill" style="background:#8FBCE6;color:#0A0B1E">1단계 여유</span>로 바뀌어 느려져요.</span></div></div>
+      <div class="mc m-noic"><span class="ic"><svg width="44" height="44" viewBox="-22 -22 44 44" aria-hidden="true"><path d="M-20 0 H20" stroke="#3D7BFF" stroke-width="6"/><path d="M0 -20 V20" stroke="#22E5FF" stroke-width="6"/><circle r="9" fill="#0A0B1E" stroke="#F2F4FF" stroke-width="4"/></svg></span><div class="tx"><span class="pill" style="background:#F2F4FF;color:#0A0B1E">환승역</span><span class="d">큰 동그라미 역에서 방향을 바꿔<br>다른 노선으로 갈아타요.</span></div></div>
+      <div class="mc m-noic"><span class="ic"><svg width="44" height="30" viewBox="0 0 44 30" aria-hidden="true"><rect x="2" y="12" width="40" height="6" rx="3" fill="#2C2366"/><rect x="2" y="12" width="26" height="6" rx="3" fill="#22E5FF"/></svg></span><div class="tx"><span class="pill" style="background:#22E5FF;color:#0A0B1E">남은 시간</span><span class="d">단계마다 45초. 시간을 다 쓰면 <b>하트 −1</b>,<br>20초가 더 주어져요.</span></div></div>
+    </div>
+    <div class="rule"><b>단계별 점수</b><dl><dt>도착</dt><dd>1단계 +300, 단계마다 +100씩 커져요</dd><dt>거리</dt><dd>최단 길보다 한 역 더 돌 때마다 −10</dd><dt>시간</dt><dd>기준 시간보다 빠르면 1초에 +15, 늦으면 −15</dd><dt>하트</dt><dd>남은 하트 하나에 +50</dd></dl></div>
+    <div class="diff" role="group" aria-label="열차 빠르기"><span>열차 빠르기</span><button type="button" data-diff="easy" aria-pressed="false">느리게</button><button type="button" data-diff="normal" aria-pressed="true">보통</button><button type="button" data-diff="hard" aria-pressed="false">빠르게</button></div>
+    <div class="keys"><span><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>이동 (WASD도 돼요)</span><span><kbd>P</kbd>멈춤</span><span><kbd>M</kbd>소리</span></div>
+    <div class="padhint"><p style="font-size:12.5px">가고 싶은 쪽 화면을 누르거나, 그쪽으로 밀어요</p></div>
+    <button class="btn start" id="startBtn" type="button">출발하기</button>
+    <a class="backlink site-home" href="/"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>홈으로</a>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden role="dialog" aria-modal="true" aria-labelledby="overTitle">
+  <div class="card res">
+    <div class="rhead"><div class="l"><p class="rtitle" id="overTitle">당신의 점수는?</p><div class="rscore"><span class="big" id="final">0</span><span class="rmeta" id="overMsg"></span></div></div><button class="share" id="shareBtn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>점수 공유하기</button></div>
+    <p class="share-note" id="shareNote" aria-live="polite"></p>
+    <div class="rgrid">
+      <div class="board"><div class="bh"><b>명예의 전당</b><span>점수가 높은 순</span></div>
+        <form class="save" id="saveForm" hidden><input id="nick" maxlength="12" autocomplete="nickname" placeholder="닉네임 (12자까지)" aria-label="닉네임"><button type="submit">기록 남기기</button></form>
+        <p class="save-note" id="saveNote" aria-live="polite"></p>
+        <ol id="board"></ol>
+        <p class="bnote">CROSSY METRO와 기록을 따로 모아요</p></div>
+      <div class="side">
+        <div class="pitch"><b><span class="a">빨리 갈까,</span> <span class="b">편하게 갈까?</span></b><span class="pc">게임에서는 길을 직접 골랐지만, </span>실제 서비스는 공공데이터로 덜 붐비는 길을 미리 찾아 드려요.</div>
+        <button class="btn again" id="againBtn" type="button">다시 출발</button>
+        <div class="links"><a class="lk site-route" href="/route">경로 찾기 시작</a><a class="lk site-home" href="/">홈으로</a><a class="lk otherm site-other" href="/game">다른 게임 →</a></div>
+        <a class="other site-other" href="/game"><svg width="44" height="30" viewBox="0 0 44 30" aria-hidden="true"><rect x="0" y="0" width="44" height="6" fill="#272B47"/><rect x="0" y="5" width="44" height="2" fill="#D9B23E"/><rect x="2" y="9" width="18" height="10" rx="2" fill="#BCD7EF"/><rect x="22" y="9" width="20" height="10" rx="2" fill="#C2552B"/><rect x="0" y="22" width="44" height="2" fill="#D9B23E"/><rect x="0" y="24" width="44" height="6" fill="#272B47"/><rect x="18" y="18" width="7" height="9" fill="#FF2E97"/></svg><span class="ot"><small>다른 게임</small><b>CROSSY METRO · 여유 칸만 골라 타고 건너기</b></span><span class="go" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  // 화면 배치: 위쪽 띠(PAD 여백 + 시계)와 노선도를 나누고, 위·아래 바깥 여백을 PAD로 똑같이 맞춤
+  let W = 960, H = 560, COLS = 9, ROWS = 6, MX = 80; const PAD = 24;
+  const MYT = PAD + 62, MYB = PAD + 18;    // 노선도 첫 줄(목적지 깃발·이름표가 들어갈 자리)·마지막 줄(나와 그림자가 들어갈 자리)
+  let GX = (W - MX * 2) / (COLS - 1), GY = (H - MYT - MYB) / (ROWS - 1);
+  const px = (c) => MX + c * GX, py = (r) => MYT + r * GY;
+  const $ = (id) => document.getElementById(id);
+
+  // 노선: 격자 위의 꺾은선. 화면 모양에 따라 지도 4가지 중 하나를 씀
+  //  desk = 컴퓨터(9×6) · tall = 휴대폰 세로(desk를 돌려 6×9) · wide = 휴대폰 가로(11×6) · wide2 = 아주 넓은 가로(13×6)
+  const DESK = [
+    { color: "#3D7BFF", pts: [[0, 1], [8, 1]] },
+    { color: "#39FFB0", pts: [[1, 0], [7, 0], [7, 5], [1, 5], [1, 0]] },
+    { color: "#FF8A3D", pts: [[0, 3], [8, 3]] },
+    { color: "#22E5FF", pts: [[4, 0], [4, 5]] },
+    { color: "#B57BFF", pts: [[6, 0], [6, 2], [8, 2], [8, 5]] },
+    { color: "#FF5FB8", pts: [[2, 1], [2, 4], [5, 4], [5, 5]] },
+    { color: "#F0C766", pts: [[0, 0], [0, 5]] },
+  ];
+  const WIDE = [
+    { color: "#3D7BFF", pts: [[0, 1], [10, 1]] },
+    { color: "#39FFB0", pts: [[2, 0], [8, 0], [8, 5], [2, 5], [2, 0]] },
+    { color: "#FF8A3D", pts: [[0, 3], [10, 3]] },
+    { color: "#22E5FF", pts: [[5, 0], [5, 5]] },
+    { color: "#B57BFF", pts: [[7, 0], [7, 2], [9, 2], [9, 5]] },
+    { color: "#FF5FB8", pts: [[3, 1], [3, 4], [6, 4], [6, 5]] },
+    { color: "#F0C766", pts: [[1, 0], [1, 5]] },
+    { color: "#9BE15D", pts: [[10, 0], [10, 5]] },
+  ];
+  const WIDE2 = [
+    { color: "#3D7BFF", pts: [[0, 1], [12, 1]] },
+    { color: "#39FFB0", pts: [[2, 0], [8, 0], [8, 5], [2, 5], [2, 0]] },
+    { color: "#FF8A3D", pts: [[0, 3], [12, 3]] },
+    { color: "#22E5FF", pts: [[5, 0], [5, 5]] },
+    { color: "#B57BFF", pts: [[7, 0], [7, 2], [9, 2], [9, 5]] },
+    { color: "#FF5FB8", pts: [[3, 1], [3, 4], [6, 4], [6, 5]] },
+    { color: "#F0C766", pts: [[1, 0], [1, 5]] },
+    { color: "#9BE15D", pts: [[10, 0], [10, 5], [12, 5], [12, 4]] },
+    { color: "#E8E8F0", pts: [[11, 0], [12, 0], [12, 2], [11, 2], [11, 4]] },
+  ];
+  const LAYOUTS = {
+    desk: { W: 960, H: 560, COLS: 9, ROWS: 6, MX: 80, lines: DESK },
+    tall: { W: 600, H: 940, COLS: 6, ROWS: 9, MX: 44, lines: DESK.map((l) => ({ color: l.color, pts: l.pts.map(([c, r]) => [r, c]) })) },
+    wide: { W: 1120, H: 560, COLS: 11, ROWS: 6, MX: 60, lines: WIDE },
+    wide2: { W: 1300, H: 560, COLS: 13, ROWS: 6, MX: 60, lines: WIDE2 },
+  };
+  const LINES = [];
+  let layout = "", wantLayout = "desk";
+  // 꺾은선을 격자 한 칸 단위 경로로 펼침
+  const unroll = (pts) => {
+    const out = [pts[0].slice()];
+    for (let i = 1; i < pts.length; i++) {
+      let [c, r] = out[out.length - 1]; const [tc, tr] = pts[i];
+      while (c !== tc || r !== tr) { c += Math.sign(tc - c); r += Math.sign(tr - r); out.push([c, r]); }
+    }
+    return out;
+  };
+  const key = (c, r) => c + "," + r;
+  const nodes = new Map(), adj = new Map();
+  let allKeys = [];
+  const addEdge = (a, b) => {
+    [a, b].forEach((n) => { if (!nodes.has(key(...n))) { nodes.set(key(...n), { c: n[0], r: n[1], lines: new Set() }); adj.set(key(...n), new Set()); } });
+    adj.get(key(...a)).add(key(...b)); adj.get(key(...b)).add(key(...a));
+  };
+  // 지도 바꾸기: 판이 진행 중이 아닐 때(시작·다음 단계·처음 화면)만 바꿈
+  function applyLayout(name) {
+    if (name === layout && LAYOUTS[name].W === W) return;
+    const L = LAYOUTS[name]; layout = name;
+    ({ W, H, COLS, ROWS, MX } = L);
+    GX = (W - MX * 2) / (COLS - 1); GY = (H - MYT - MYB) / (ROWS - 1);
+    cv.width = W; cv.height = H;
+    LINES.length = 0; L.lines.forEach((l) => LINES.push({ color: l.color, pts: l.pts, path: unroll(l.pts) }));
+    nodes.clear(); adj.clear();
+    LINES.forEach((l, li) => { for (let i = 1; i < l.path.length; i++) addEdge(l.path[i - 1], l.path[i]); l.path.forEach((n) => nodes.get(key(...n)).lines.add(li)); });
+    allKeys = [...nodes.keys()];
+  }
+  applyLayout("desk");
+  const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const step = (k, d) => { const n = nodes.get(k), t = key(n.c + DIRS[d][0], n.r + DIRS[d][1]); return adj.get(k).has(t) ? t : null; };
+
+  // ───────── 소리: CROSSY METRO와 같은 8비트 전자오락 음원 (직접 만든 짧은 음형, 기존 게임 멜로디 사용 안 함) ─────────
+  let ac=null, muted=false, BUS=null, PW={}, NOISE=null;
+  try{muted=localStorage.getItem("subway-maze-mute")==="1"}catch(e){}
+  const MI=n=>440*Math.pow(2,(n-69)/12);              // 음 번호(미디) → 주파수
+  function audioInit(){
+    if(!ac){ try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return} }
+    if(ac.state!=="running") ac.resume();
+    if(BUS) return;
+    const comp=ac.createDynamicsCompressor(); comp.threshold.value=-16; comp.ratio.value=4; comp.attack.value=.003; comp.release.value=.12;
+    BUS={master:ac.createGain(),sfx:ac.createGain(),bgm:ac.createGain()};
+    BUS.master.gain.value=muted?0:.9; BUS.sfx.gain.value=1; BUS.bgm.gain.value=.5;
+    BUS.sfx.connect(BUS.master); BUS.bgm.connect(BUS.master); BUS.master.connect(comp).connect(ac.destination);
+    // 펄스파 12.5% · 25% · 50% (옛 게임기 소리의 핵심)
+    for(const [k,d] of [["p12",.125],["p25",.25],["p50",.5]]){
+      const n=40, re=new Float32Array(n), im=new Float32Array(n);
+      for(let i=1;i<n;i++) re[i]=2*Math.sin(Math.PI*i*d)/(Math.PI*i);
+      PW[k]=ac.createPeriodicWave(re,im);
+    }
+    // 거친 잡음 (몇 샘플씩 같은 값을 유지해 '지직' 느낌)
+    const len=ac.sampleRate, buf=ac.createBuffer(1,len,ac.sampleRate), ch=buf.getChannelData(0);
+    let v=0; for(let i=0;i<len;i++){ if(i%3===0) v=Math.random()*2-1; ch[i]=v; }
+    NOISE=buf;
+  }
+  // 음 하나: wave = p12 · p25 · p50 · tri
+  function nt(f,dur,{wave="p25",vol=.1,at=0,f1=null,rel=.03,vib=0,bus="sfx",abs=false}={}){
+    if(!ac||!BUS) return;
+    const s=abs?at:ac.currentTime+at, o=ac.createOscillator(), g=ac.createGain();
+    if(wave==="tri") o.type="triangle"; else o.setPeriodicWave(PW[wave]);
+    o.frequency.setValueAtTime(f,s); if(f1) o.frequency.exponentialRampToValueAtTime(f1,s+dur);
+    if(vib){ const l=ac.createOscillator(), lg=ac.createGain(); l.frequency.value=vib; lg.gain.value=f*.03; l.connect(lg).connect(o.frequency); l.start(s); l.stop(s+dur+rel+.02); }
+    g.gain.setValueAtTime(0,s); g.gain.linearRampToValueAtTime(vol,s+.004);
+    g.gain.setValueAtTime(vol,s+dur); g.gain.linearRampToValueAtTime(0,s+dur+rel);
+    o.connect(g).connect(BUS[bus]); o.start(s); o.stop(s+dur+rel+.02);
+  }
+  function nz(dur,{vol=.1,at=0,rate=1,type="highpass",freq=1000,q=.7,bus="sfx",abs=false,decay=true}={}){
+    if(!ac||!BUS) return;
+    const s=abs?at:ac.currentTime+at, src=ac.createBufferSource(), fl=ac.createBiquadFilter(), g=ac.createGain();
+    src.buffer=NOISE; src.playbackRate.value=rate; fl.type=type; fl.frequency.value=freq; fl.Q.value=q;
+    g.gain.setValueAtTime(vol,s); decay?g.gain.exponentialRampToValueAtTime(.0005,s+dur):g.gain.setValueAtTime(vol,s+dur);
+    src.connect(fl).connect(g).connect(BUS[bus]); src.start(s,Math.random()*.5); src.stop(s+dur+.02);
+  }
+  // 빠른 아르페지오 (음 번호 목록을 차례로)
+  function arp(notes,step,{wave="p25",vol=.08,at=0,hold=1}={}){ notes.forEach((n,i)=>nt(MI(n),step*hold,{wave,vol,at:at+i*step,rel:.02})); }
+
+  const sfx={
+    step:()=>nt(MI(84),.035,{wave:"p12",vol:.06,f1:MI(79)}),                                // 옆으로 '틱'
+    hop:()=>nt(MI(60),.09,{wave:"p25",vol:.09,f1:MI(79)}),                                  // 앞으로 '뿅'
+    jump:()=>{ nt(MI(55),.2,{wave:"p25",vol:.09,f1:MI(84)}); nt(MI(67),.2,{wave:"p12",vol:.04,f1:MI(96),at:.02}); }, // 2칸 '뾰옹'
+    board:()=>arp([79,84,91],.045,{wave:"p50",vol:.07}),                                     // 여유 칸 탑승 '띠리링'
+    arrive:()=>{ arp([72,76,79],.06,{wave:"p25",vol:.08}); nt(MI(84),.22,{wave:"p25",vol:.09,at:.18,vib:7});
+                 nt(MI(48),.12,{wave:"tri",vol:.16}); nt(MI(55),.25,{wave:"tri",vol:.16,at:.18}); },  // 역 도착 팡파르
+    combo:n=>nt(MI(76+n*2),.05,{wave:"p12",vol:.06}),                                        // 콤보가 쌓일수록 음이 올라감
+    oneUp:()=>{ arp([72,76,79,84,88,91,96],.05,{wave:"p50",vol:.07}); arp([84,88,91,96],.05,{wave:"p12",vol:.035,at:.36}); }, // 하트 +1
+    full:()=>arp([88,91,88,91],.05,{wave:"p12",vol:.06}),                                     // 콤보 달성(하트 가득)
+    fail:()=>{ nt(MI(52),.16,{wave:"p50",vol:.09,f1:MI(36)}); nt(MI(51),.16,{wave:"p25",vol:.05,f1:MI(35),at:.01}); nz(.14,{vol:.12,rate:.5,type:"lowpass",freq:1800}); }, // 혼잡 칸 '부웅'
+    crumble:()=>nz(.16,{vol:.05,rate:.25,type:"lowpass",freq:500}),                           // 뒤에서 무너지는 '두둑'
+    fall:()=>{ nt(MI(88),.9,{wave:"p25",vol:.08,f1:MI(40),vib:9}); nz(.5,{vol:.06,rate:.3,type:"lowpass",freq:700,at:.4}); }, // 추락 '휘이이잉'
+    beam:()=>{ for(let i=0;i<10;i++) nt(MI(100-i*2.5),.03,{wave:i%2?"p12":"p25",vol:.05,at:i*.035}); }, // 빛기둥이 내려오는 '주르륵'
+    land:()=>{ nt(MI(91),.06,{wave:"p50",vol:.06}); nt(MI(96),.3,{wave:"p12",vol:.06,at:.06,vib:6}); },  // 바닥에 닿는 '팅'
+    count:()=>nt(MI(69),.1,{wave:"p50",vol:.08}),                                              // 3 · 2 · 1
+    go:()=>{ nt(MI(81),.28,{wave:"p50",vol:.09}); nt(MI(57),.28,{wave:"tri",vol:.15}); },      // 출발!
+    over:()=>{ const m=[[67,.14],[63,.14],[60,.14],[55,.28],[56,.14],[55,.42]]; let t=.35;
+               m.forEach(([n,d])=>{ nt(MI(n),d*.85,{wave:"p25",vol:.08,at:t}); nt(MI(n-24),d*.85,{wave:"tri",vol:.14,at:t}); t+=d; }); },
+    power:()=>{ for(let i=0;i<8;i++) nt(MI(64+i*3),.04,{wave:i%2?"p12":"p50",vol:.07,at:i*.04}); nt(MI(91),.3,{wave:"p25",vol:.07,at:.34,vib:8}); }, // 여유: 파워업
+    goal:()=>{ arp([72,76,79,84],.07,{wave:"p25",vol:.09}); nt(MI(88),.35,{wave:"p25",vol:.09,at:.3,vib:6}); arp([84,88,91,96],.05,{wave:"p12",vol:.04,at:.5});
+               [48,55,60].forEach((n,i)=>nt(MI(n),.14,{wave:"tri",vol:.16,at:i*.14})); },             // 목적지 도착 팡파르
+    level:()=>{ arp([67,72,76,79],.06,{wave:"p50",vol:.06}); },                                       // 다음 단계
+    warn:()=>{ nt(MI(93),.05,{wave:"p12",vol:.04}); nt(MI(93),.05,{wave:"p12",vol:.04,at:.1}); }    // 끊김이 가까울 때 '삐삐'
+  };
+
+  // 배경 음악: CROSSY METRO와 같은 곡을 4도 올려(D단조) 사용. 단계가 오를수록 빨라지고 시간이 부족하면 더 급해짐
+  const BGM={
+    lead:[76,0,81,0,84,83,81,76, 77,0,81,0,84,86,84,81, 79,0,84,0,88,86,84,79, 83,0,86,0,79,0,0,0,
+          81,81,0,88,0,86,84,0, 84,81,77,81,84,89,88,84, 88,86,84,83,84,86,88,91, 91,0,89,0,86,0,83,0],
+    chord:[[57,60,64],[53,57,60],[55,60,64],[55,59,62]],
+    root:[45,41,48,43],
+    on:false, step:0, next:0, timer:null, bpm:138, hurry:false, tr:5
+  };
+  function bgmTempo(){ return Math.min(176,BGM.bpm)*(BGM.hurry?1.12:1); }
+  function bgmTick(){
+    if(!ac||!BGM.on) return;
+    while(BGM.next<ac.currentTime+.12){
+      const s=BGM.step, t=BGM.next, d16=60/bgmTempo()/4, bar=Math.floor(s/16)%8, ch=bar%4, i16=s%16;
+      if(i16%2===0){ const n=BGM.lead[(bar*8+i16/2)%64]; if(n) nt(MI(n+BGM.tr),d16*1.6,{wave:"p25",vol:.055,abs:true,at:t,rel:.02,bus:"bgm"}); }
+      nt(MI(BGM.chord[ch][i16%3]+12+BGM.tr),d16*.7,{wave:"p12",vol:.022,abs:true,at:t,rel:.01,bus:"bgm"});      // 반짝이는 화음 아르페지오
+      if(i16%2===0) nt(MI(BGM.root[ch]+BGM.tr+(i16%4===2?12:0)),d16*1.5,{wave:"tri",vol:.13,abs:true,at:t,rel:.02,bus:"bgm"}); // 통통 튀는 베이스
+      if(i16%8===0) nt(140,.07,{wave:"tri",vol:.18,abs:true,at:t,f1:45,bus:"bgm"});                // 킥
+      if(i16%8===4) nz(.09,{vol:.09,abs:true,at:t,type:"bandpass",freq:1800,q:.8,bus:"bgm"});      // 스네어
+      if(i16%2===1) nz(.03,{vol:.035,abs:true,at:t,type:"highpass",freq:7000,bus:"bgm"});          // 하이햇
+      if(BGM.hurry&&i16===0) nt(MI(93),.05,{wave:"p12",vol:.03,abs:true,at:t,bus:"bgm"});
+      BGM.step++; BGM.next+=d16;
+    }
+  }
+  function bgmStart(){ if(!ac||!BUS) return; BGM.on=true; BGM.step=0; BGM.next=ac.currentTime+.05; clearInterval(BGM.timer); BGM.timer=setInterval(bgmTick,25); bgmTick(); }
+  function bgmStop(){ BGM.on=false; clearInterval(BGM.timer); BGM.timer=null; }
+
+  // 휴대폰(특히 아이폰)은 무음 스위치를 켜면 웹 소리가 막힘 → 무음 오디오를 함께 틀어 '미디어 재생'으로 분류되게 함
+  let media = null;
+  function silentWav() {
+    const sr = 8000, n = 800, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+    const w = (o, str) => [...str].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)));
+    w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([b], { type: "audio/wav" }));
+  }
+  function wakeAudio() {
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+    try { if (!media) { media = new Audio(silentWav()); media.loop = true; media.setAttribute("playsinline", ""); } const pr = media.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {}
+    if (ac && ac.state !== "running" && !(st && st.hold)) ac.resume();
+  }
+  addEventListener("pointerdown", () => { if (ac) wakeAudio(); }, true);
+  addEventListener("touchend", () => { if (ac) wakeAudio(); }, true);
+  // 매 프레임: 단계에 따라 배경 음악 빠르기, 남은 시간이 30% 아래면 급한 모드 + 경고음
+  function soundTick(lv, timeFrac, running) {
+    if (!BUS) return;
+    BGM.bpm = 138 + (lv - 1) * 4;
+    const hurry = running && timeFrac < 0.3;
+    if (hurry && !BGM.hurry) sfx.warn();
+    BGM.hurry = hurry;
+  }
+  const setMute = (on) => {
+    muted = on; try { localStorage.setItem("subway-maze-mute", on ? "1" : "0"); } catch (e) {}
+    if (BUS) BUS.master.gain.setTargetAtTime(on ? 0 : 0.9, ac.currentTime, 0.02);
+    $("muteBtn").textContent = on ? "🔇 소리 켜기" : "🔊 소리 끄기"; $("muteBtn").setAttribute("aria-pressed", String(on));
+  };
+
+  let st, raf, last;
+  // 난이도: 단계가 오를 때마다 조금씩 어려워짐. 주인공은 초당 4.2역
+  //  base = 1단계 열차 속도(초당 역 수), up = 단계마다 더하는 속도, max = 최고 속도
+  //  start = 1단계 열차 수, every = 몇 단계마다 열차를 한 대 늘릴지, most = 최대 열차 수
+  const DIFF = {
+    easy:   { base: 0.6, up: 0.04, max: 1.4, start: 2, every: 3, most: 5 },
+    normal: { base: 0.8, up: 0.06, max: 2.0, start: 2, every: 2, most: 6 },
+    hard:   { base: 1.1, up: 0.08, max: 2.8, start: 3, every: 2, most: 7 },
+  };
+  let diff = "normal";
+  try { const d = localStorage.getItem("subway-maze-diff"); if (DIFF[d]) diff = d; } catch (e) {}
+  const diffBtns = [...document.querySelectorAll("[data-diff]")];
+  const showDiff = () => diffBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.diff === diff)));
+  diffBtns.forEach((b) => b.addEventListener("click", () => {
+    diff = b.dataset.diff; showDiff();
+    try { localStorage.setItem("subway-maze-diff", diff); } catch (e) {}
+    if (st && !st.over) { const D = DIFF[diff]; st.trains.forEach((tr) => (tr.speed = Math.min(D.max, D.base + (st.level - 1) * D.up) * (0.85 + Math.random() * 0.3))); }
+  }));
+  showDiff();
+  const INTRO = 3.0;   // 시작 연출 시간(초): 빛기둥 → 3·2·1·출발! (CROSSY METRO와 같음)
+  const ARRIVE_BASE = 300, ARRIVE_STEP = 100;   // 목적지에 닿을 때마다 받는 보상: 1단계 300, 단계마다 +100
+  const DIST_PT = 10;   // 최단 경로보다 한 역 더 돌 때마다 빼는 점수 (시간 점수: 1초에 15점)
+  const SAFE = 4;   // 시작할 때 열차와 주인공 사이에 최소한 비워 둘 역 수
+  const bfsAll = (a) => { const q = [a], d = new Map([[a, 0]]); while (q.length) { const k = q.shift(); adj.get(k).forEach((n) => { if (!d.has(n)) { d.set(n, d.get(k) + 1); q.push(n); } }); } return d; };
+  const bfs = (a, b) => { const q = [a], d = new Map([[a, 0]]); while (q.length) { const k = q.shift(); if (k === b) return d.get(k); adj.get(k).forEach((n) => { if (!d.has(n)) { d.set(n, d.get(k) + 1); q.push(n); } }); } return 99; };
+  const dist = (a, b) => Math.abs(nodes.get(a).c - nodes.get(b).c) + Math.abs(nodes.get(a).r - nodes.get(b).r);
+
+  function setupLevel() {
+    applyLayout(wantLayout); requestAnimationFrame(fitScreen);
+    const lv = st.level;
+    let start, goal;
+    do { start = allKeys[Math.floor(Math.random() * allKeys.length)]; goal = allKeys[Math.floor(Math.random() * allKeys.length)]; } while (dist(start, goal) < 8);
+    st.p = { at: start, to: null, t: 0, dir: null, want: null };
+    st.goal = goal;
+    st.seats = new Set();
+    while (st.seats.size < 2) { const k = allKeys[Math.floor(Math.random() * allKeys.length)]; if (k !== start && k !== goal) st.seats.add(k); }
+    st.shortest = bfs(start, goal);
+    st.par = st.shortest / 4.2 * 1.6 + 1.5;   // 기준 시간(초): 가장 짧은 길을 쉬지 않고 갈 때의 1.6배
+    st.moves = 0; st.elapsed = 0; st.hits = 0;
+    st.intro = INTRO;                         // 시작 전 위치 알려 주기 (빛기둥 + 카운트다운)
+    robot("search", `분홍 빛이 내려온 곳이 <b style="color:#FF2E97">나</b>, 초록 빛이 <b>목적지</b>예요. 최단 ${bfs(start, goal)}역이에요.`);
+    // 혼잡 열차: 노선마다 하나씩, 단계가 오를수록 늘고 빨라짐
+    const D0 = DIFF[diff];
+    const n = Math.min(LINES.length, D0.most, D0.start + Math.floor((lv - 1) / D0.every));
+    const order = LINES.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, n);
+    const distFromStart = bfsAll(start), used = new Set();
+    st.trains = order.map((li, i) => {
+      const L = LINES[li].path.length - 1;
+      let pos = Math.random() * L;
+      // 시작역에서 노선을 따라 SAFE역 이상 떨어진 곳에만 놓음 (다른 열차와도 겹치지 않게)
+      const path = LINES[li].path;
+      const sp = nodes.get(start);
+      const far = path.map((n, k) => [k, distFromStart.get(key(...n)) ?? 99, Math.abs(n[0] - sp.c) + Math.abs(n[1] - sp.r)]).filter(([k, d, m]) => d >= SAFE && m >= 3 && !used.has(li + ":" + k));
+      if (far.length) pos = far[Math.floor(Math.random() * far.length)][0];
+      else pos = path.map((n, k) => [k, distFromStart.get(key(...n)) ?? 99]).sort((a, b) => b[1] - a[1])[0][0];
+      used.add(li + ":" + pos);
+      const D = DIFF[diff];
+      return { li, pos, dir: Math.random() < 0.5 ? 1 : -1, speed: Math.min(D.max, D.base + (lv - 1) * D.up) * (0.85 + Math.random() * 0.3) };
+    });
+    st.timeLeft = 45; st.invuln = 1.5; st.slow = 0;
+    hud();
+  }
+
+  let best = 0; try { best = Number(localStorage.getItem("subway-maze-best") || 0); } catch (e) {}
+  function hud() {
+    $("score").textContent = st.score.toLocaleString("ko-KR"); $("level").textContent = st.level; $("best").textContent = Math.max(best, st.score).toLocaleString("ko-KR");
+    $("hearts").textContent = "💚".repeat(Math.max(0, st.hearts)) + "🤍".repeat(Math.max(0, 3 - st.hearts));
+    const left = Math.max(0, st.timeLeft) / 45;
+    $("timeBar").style.transform = `scaleX(${Math.min(1, left)})`; $("timeNum").textContent = Math.ceil(Math.max(0, st.timeLeft));
+    $("timeChip").classList.toggle("low", left < 0.3);
+    $("goalChip").innerHTML = `목적지까지 <small>최단 ${st.shortest}역 · 지금 ${st.moves}역 이동</small>`;
+  }
+
+  const TL = 96, TT = 40;   // 혼잡 열차 한 칸의 길이·폭
+  const trainXY = (tr) => {
+    const path = LINES[tr.li].path, i = Math.floor(tr.pos), f = tr.pos - i, a = path[i], b = path[Math.min(i + 1, path.length - 1)];
+    return [px(a[0] + (b[0] - a[0]) * f), py(a[1] + (b[1] - a[1]) * f), b[0] - a[0], b[1] - a[1]];
+  };
+  const playerXY = () => {
+    const a = nodes.get(st.p.at); if (!st.p.to) return [px(a.c), py(a.r)];
+    const b = nodes.get(st.p.to); return [px(a.c + (b.c - a.c) * st.p.t), py(a.r + (b.r - a.r) * st.p.t)];
+  };
+
+  function update(dt) {
+    const p = st.p, speed = 4.2;
+    // 플레이어 이동: 역에 서 있으면 원하는 방향 → 지금 방향 순서로 갈 수 있는 길을 찾음
+    if (!p.to) {
+      let nxt = p.want && step(p.at, p.want);
+      if (nxt) { p.dir = p.want; p.want = null; } else nxt = p.dir && step(p.at, p.dir);
+      if (nxt) { p.to = nxt; p.t = 0; }
+    } else {
+      // 이동 중 반대 방향을 누르면 바로 되돌아감
+      if (p.want && DIRS[p.want] && DIRS[p.dir] && DIRS[p.want][0] === -DIRS[p.dir][0] && DIRS[p.want][1] === -DIRS[p.dir][1]) {
+        [p.at, p.to] = [p.to, p.at]; p.t = 1 - p.t; p.dir = p.want; p.want = null;
+      }
+      p.t += dt * speed;
+      if (p.t >= 1) {
+        p.at = p.to; p.to = null; p.t = 0;
+        st.moves++; sfx.step();
+        if (st.seats.delete(p.at)) { st.slow = 5; sfx.power(); robot("ok", `<span class="lv l1g">여유</span> 발견! <b>5초 동안</b> 혼잡 열차가 <span class="lv l1">1단계 여유</span>로 바뀌어 느려져요.`); }
+        if (p.at === st.goal) return levelClear();
+      }
+    }
+    // 혼잡 열차 이동 (끝까지 가면 되돌아옴, 순환선은 계속 돎)
+    st.trains.forEach((tr) => {
+      const path = LINES[tr.li].path, L = path.length - 1, loop = key(...path[0]) === key(...path[L]);
+      tr.pos += tr.dir * tr.speed * (st.slow > 0 ? 0.45 : 1) * dt;
+      if (loop) tr.pos = (tr.pos + L) % L;
+      else if (tr.pos > L) { tr.pos = L - (tr.pos - L); tr.dir = -1; }
+      else if (tr.pos < 0) { tr.pos = -tr.pos; tr.dir = 1; }
+    });
+    st.slow = Math.max(0, st.slow - dt);
+    st.invuln = Math.max(0, st.invuln - dt);
+    // 부딪힘
+    if (st.invuln <= 0) {
+      const [x, y] = playerXY();
+      for (const tr of st.trains) {
+        const [tx, ty] = trainXY(tr);
+        // 열차 방향에 맞춘 직사각형으로 부딪힘 판정(길어진 차체 앞뒤까지)
+        const a = -(tr.ang || 0), lx = (x - tx) * Math.cos(a) - (y - ty) * Math.sin(a), ly = (x - tx) * Math.sin(a) + (y - ty) * Math.cos(a);
+        if (Math.abs(lx) < TL / 2 + 8 && Math.abs(ly) < TT / 2 + 6) {
+          st.hearts--; st.hits++; st.score = Math.max(0, st.score - 100); st.invuln = 2; st.shake = 0.35; sfx.fail();
+          robot("err", `<span class="lv l5">5단계 매우 혼잡</span> 열차에 끼였어요. <b class="p">하트 −1 · 점수 −100</b>`);
+          if (st.hearts <= 0) return end(false);
+          break;
+        }
+      }
+    }
+    st.timeLeft -= dt; st.elapsed += dt;
+    if (st.timeLeft <= 0) { st.hearts--; sfx.fail(); robot("err", `시간이 다 됐어요. <b class="p">하트 −1</b> · 20초를 더 드릴게요.`); if (st.hearts <= 0) return end(false); st.timeLeft = 20; }
+    st.shake = Math.max(0, (st.shake || 0) - dt);
+    hud();
+  }
+
+  function levelClear() {
+    const distPts = (st.shortest - st.moves) * DIST_PT;
+    const timePts = Math.round((st.par - st.elapsed) * 15);
+    const heartPts = st.hearts * 50;
+    const arrivePts = ARRIVE_BASE + (st.level - 1) * ARRIVE_STEP;
+    const total = arrivePts + distPts + timePts + heartPts;
+    st.score = Math.max(0, st.score + total); sfx.goal(); robot("ok", `<b>목적지 도착!</b> ${st.level}단계 점수는 ${total >= 0 ? "+" : ""}${total}점이에요.`);
+    st.result = { t: 2.8, rows: [
+      [`도착 보상 (${st.level}단계)`, arrivePts],
+      [`거리  ${st.moves}역 이동 (최단 ${st.shortest}역)`, distPts],
+      [`시간  ${st.elapsed.toFixed(1)}초 (기준 ${st.par.toFixed(1)}초)`, timePts],
+      [`남은 하트 ${st.hearts}개`, heartPts],
+    ], total };
+    st.pause = 2.8; hud();
+    const run = st;
+    setTimeout(() => { if (st === run && !st.over) { st.level++; st.result = null; setupLevel(); sfx.level(); sfx.beam(); } }, 2800);
+  }
+
+  // ───────── 그림: CROSSY METRO와 같은 그림체 ─────────
+  //  나 = 복셀 '나'(핑크 그림자·남색 외곽선·핑크 빛) · 혼잡 열차 = 5단계 주황 열차를 위에서 본 모습(지붕 점 5개)
+  //  여유를 지나면 5초 동안 1단계 하늘색 열차(점 1개)로 바뀌며 느려짐 · 목적지 = 어두운 받침 + 흰·초록 빛 고리 + 깃발
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  const FONT = '"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif', PIXEL = '"Press Start 2P",' + FONT;
+  const PAL = {
+    5: { roof: ["#7E2A0E", "#C2552B", "#E37A50"], edge: "#6A220B", ac: "#E8916C", glass: "#1A0A08", dot: "#FF8A5C", glow: "#E0551F", n: 5 },
+    1: { roof: ["#7FA8CF", "#BCD7EF", "#E3EFFA"], edge: "#5F89B0", ac: "#F4F9FF", glass: "#0A0F22", dot: "#8FBCE6", glow: "#8FBCE6", n: 1 },
+  };
+  // 복셀 '나' (CROSSY METRO와 같은 그림). 표정별로 한 번만 그려 두고 꺼내 씀
+  const ME = [
+    [28,121,28,4,"#FFFFFF"],[28,125,28,7,"#D6DAF2"],[64,121,28,4,"#FFFFFF"],[64,125,28,7,"#D6DAF2"],[28,130,64,2,"#22E5FF"],
+    [34,104,20,18,"#1D1A44"],[66,104,20,18,"#1D1A44"],
+    [11,60,14,6,"#6E98FF"],[11,66,14,32,"#4070F5"],[12,97,12,8,"#F7C9AE"],
+    [95,60,14,6,"#5C86FF"],[95,66,14,32,"#3A63DA"],[96,97,12,8,"#E9B696"],
+    [25,58,70,9,"#7FA6FF"],[25,67,70,20,"#5786FF"],[25,87,70,19,"#4A78F7"],[74,67,21,39,"rgba(107,61,240,.35)"],
+    [41,87,38,11,"#2C3CB4"],[50,68,3,11,"#EEF0FF"],[67,68,3,11,"#EEF0FF"],[35,60,50,7,"#2C3CB4"],
+    [24,34,8,13,"#F2B596"],[88,34,8,13,"#E9A985"],[31,22,58,38,"#FFE3D1"],[74,22,15,38,"rgba(214,140,110,.25)"],
+    [38,47,7,3,"rgba(255,122,182,.55)"],[75,47,7,3,"rgba(255,122,182,.55)"],
+    [29,2,62,11,"#FF8CCB"],[29,13,62,14,"#FF2E97"],[29,27,62,4,"#C9156F"],
+    [2,20,30,5,"#FF5AAE"],[2,25,30,6,"#E01F84"],[2,31,30,2,"#9E0F59"],
+  ];
+  const SPR = {};
+  function sprite(mood) {
+    if (SPR[mood]) return SPR[mood];
+    const k = 2, pad = 14, c = document.createElement("canvas"); c.width = (120 + pad * 2) * k; c.height = (136 + pad * 2) * k;
+    const g = c.getContext("2d"), base = document.createElement("canvas"); base.width = c.width; base.height = c.height;
+    const b = base.getContext("2d"); b.setTransform(k, 0, 0, k, pad * k, pad * k);
+    ME.forEach(([x, y, w, h, col]) => { b.fillStyle = col; b.fillRect(x, y, w + 0.5, h + 0.5); });
+    const ink = "#241A44"; b.fillStyle = ink; b.strokeStyle = ink; b.lineWidth = 2.6; b.lineCap = "round"; b.lineJoin = "round";
+    if (mood === "pain") { b.beginPath(); b.moveTo(44, 36); b.lineTo(51, 41); b.lineTo(44, 46); b.moveTo(76, 36); b.lineTo(69, 41); b.lineTo(76, 46); b.stroke(); b.fillStyle = "#fff"; b.fillRect(52, 49, 16, 5); b.strokeRect(52, 49, 16, 5); }
+    else if (mood === "happy") { b.beginPath(); b.arc(48, 43, 4, Math.PI, 0); b.moveTo(74, 43); b.arc(70, 43, 4, Math.PI, 0); b.stroke(); b.fillStyle = "#7A1F4A"; b.beginPath(); b.arc(60, 49, 6, 0, Math.PI); b.fill(); }
+    else { b.fillRect(45, 37, 7, 8); b.fillRect(67, 37, 7, 8); b.fillRect(54, 50, 12, 3); }
+    // 남색 외곽선 → 핑크 빛 → 본그림
+    const o = 3; g.shadowColor = "#0A0B1E";
+    [[o, 0], [-o, 0], [0, o], [0, -o]].forEach(([a, d]) => { g.shadowOffsetX = a; g.shadowOffsetY = d; g.drawImage(base, 0, 0); });
+    g.shadowOffsetX = 0; g.shadowOffsetY = 0; g.shadowColor = "rgba(255,46,151,.9)";
+    [16, 8, 3].forEach((bl) => { g.shadowBlur = bl; g.drawImage(base, 0, 0); });
+    g.shadowColor = "transparent"; g.shadowBlur = 0; g.drawImage(base, 0, 0);
+    return (SPR[mood] = { c, pad, k });
+  }
+  // 바닥에 번지는 부드러운 그림자 (핑크=나, 초록=목적지)
+  function softShadow(x, y, rx, ry, rgb, a = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+    g.addColorStop(0, `rgba(${rgb === "pink" ? "150,10,80" : "12,120,80"},${0.95 * a})`); g.addColorStop(0.5, `rgba(${rgb === "pink" ? "255,46,151" : "57,255,176"},${0.8 * a})`); g.addColorStop(1, `rgba(${rgb === "pink" ? "255,46,151" : "57,255,176"},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+  function drawMe(x, footY, s, mood, alpha, flip, lift) {
+    const S = sprite(mood), w = (120 + S.pad * 2) * s, h = (136 + S.pad * 2) * s;
+    softShadow(x, footY, 24 * s / 0.4, 7 * s / 0.4, "pink", alpha);
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, footY - lift);
+    if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(S.c, -w / 2, -(136 + S.pad) * s, w, h);
+    ctx.restore();
+  }
+  // 혼잡 열차: 위에서 본 전동차 한 칸. 가는 쪽에 앞 유리와 불빛
+  function drawTrain(tr, x, y, calm) {
+    const P = PAL[calm ? 1 : 5], L = TL, T = TT, line = LINES[tr.li].color;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(tr.ang || 0);
+    const beam = ctx.createLinearGradient(L / 2, 0, L / 2 + 40, 0); beam.addColorStop(0, "rgba(255,226,140,.42)"); beam.addColorStop(1, "rgba(255,226,140,0)");
+    ctx.fillStyle = beam; ctx.beginPath(); ctx.moveTo(L / 2, -T / 2 + 8); ctx.lineTo(L / 2 + 40, -T / 2 - 6); ctx.lineTo(L / 2 + 40, T / 2 + 6); ctx.lineTo(L / 2, T / 2 - 8); ctx.fill();
+    ctx.fillStyle = "rgba(10,11,30,.55)"; roundRect(-L / 2, T / 2 - 4, L, 8, 3); ctx.fill();
+    const g = ctx.createLinearGradient(0, -T / 2, 0, T / 2); g.addColorStop(0, P.roof[2]); g.addColorStop(0.55, P.roof[1]); g.addColorStop(1, P.roof[0]);
+    ctx.shadowColor = P.glow; ctx.shadowBlur = 18; ctx.fillStyle = g; roundRect(-L / 2, -T / 2, L, T, 9); ctx.fill();
+    ctx.shadowBlur = 0; ctx.strokeStyle = P.edge; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = line; ctx.fillRect(-L / 2 + 3, T / 2 - 6, L - 6, 3);
+    ctx.globalAlpha = 0.85; ctx.fillStyle = P.ac; roundRect(-L / 2 + 8, -T / 2 + 7, 14, T - 14, 2); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = P.glass; roundRect(L / 2 - 12, -T / 2 + 6, 7, T - 12, 3); ctx.fill();
+    ctx.fillStyle = "#0A0B1E"; roundRect(-27, -7, 54, 14, 7); ctx.fill();
+    for (let i = 0; i < 5; i++) { ctx.globalAlpha = i < P.n ? 1 : 0.28; ctx.fillStyle = P.dot; ctx.beginPath(); ctx.arc(-20 + i * 10, 0, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+  // 알약 모양 이름표 (테두리 없음)
+  function pill(x, y, text, bg, fg, fs, glow) {
+    ctx.font = `900 ${fs}px ${FONT}`; const tw = ctx.measureText(text).width, h = fs * 1.6, w = tw + fs * 1.4;
+    ctx.save(); if (glow) { ctx.shadowColor = bg; ctx.shadowBlur = 14; }
+    ctx.fillStyle = bg; roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = fg; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, x, y + 1);
+    return w;
+  }
+  function drawGoal(gx, gy, time, k) {
+    // 어두운 받침: 목적지 둘레의 노선 색을 덮어 초록 노선 위에서도 잘 보이게
+    const R = 50 * k, rg = ctx.createRadialGradient(gx, gy, 0, gx, gy, R);
+    rg.addColorStop(0, "rgba(5,6,13,.97)"); rg.addColorStop(0.55, "rgba(5,6,13,.97)"); rg.addColorStop(0.75, "rgba(5,6,13,.75)"); rg.addColorStop(1, "rgba(5,6,13,0)");
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(gx, gy, R, 0, Math.PI * 2); ctx.fill();
+    // 퍼지는 초록 고리 + 흰 고리
+    const pr = (time / 1100) % 1;
+    ctx.strokeStyle = `rgba(57,255,176,${(1 - pr) * 0.7})`; ctx.lineWidth = 2 * k; ctx.beginPath(); ctx.arc(gx, gy, (28 + pr * 30) * k, 0, Math.PI * 2); ctx.stroke();
+    ctx.save(); ctx.shadowColor = "#39FFB0"; ctx.shadowBlur = 12; ctx.strokeStyle = "rgba(242,244,255,.9)"; ctx.lineWidth = 2 * k;
+    ctx.beginPath(); ctx.arc(gx, gy, 28 * k, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    softShadow(gx, gy, 26 * k, 9 * k, "green");
+    // 픽셀 깃발 (남색 외곽선 + 흰 빛)
+    const fx = gx - 4 * k, fy = gy - 46 * k;
+    ctx.save(); ctx.shadowColor = "rgba(242,244,255,.7)"; ctx.shadowBlur = 8;
+    const flag = () => {
+      ctx.fillStyle = "#F2F4FF"; ctx.fillRect(fx + 2 * k, fy + 2 * k, 4 * k, 44 * k);
+      ctx.fillStyle = "#39FFB0"; ctx.fillRect(fx + 6 * k, fy + 4 * k, 26 * k, 16 * k);
+      ctx.fillStyle = "rgba(10,11,30,.25)"; ctx.fillRect(fx + 6 * k, fy + 4 * k, 8 * k, 8 * k); ctx.fillRect(fx + 22 * k, fy + 12 * k, 10 * k, 8 * k);
+    };
+    ctx.fillStyle = "#0A0B1E"; ctx.fillRect(fx + 0.5 * k, fy + 0.5 * k, 7 * k, 47 * k); ctx.fillRect(fx + 4.5 * k, fy + 2.5 * k, 29 * k, 19 * k);
+    ctx.shadowBlur = 0; flag(); ctx.restore();
+    const right = gx > W - 170 * k;
+    ctx.save(); ctx.textAlign = "center";
+    if (!(st.intro > 0)) pill(right ? gx - 60 * k : gx + 66 * k, fy + 12 * k, "목적지", "#39FFB0", "#0A0B1E", 13 * k, false);   // 시작 연출 중에는 큰 이름표만
+    ctx.restore();
+  }
+  // 빛기둥: 위에서 내려와 발밑에 닿음 (끝과 양옆이 흐린 부드러운 빛)
+  function lightBeam(x, bottom, rgb, lite, a, k) {
+    if (bottom <= 0) return;
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a;
+    const g = ctx.createLinearGradient(0, 0, 0, bottom); g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.45, `rgba(${rgb},.22)`); g.addColorStop(1, `rgba(${rgb},.55)`);
+    ctx.filter = "blur(10px)"; ctx.fillStyle = g; roundRect(x - 40 * k, -20, 80 * k, bottom + 20, 40 * k); ctx.fill();
+    const g2 = ctx.createLinearGradient(0, 0, 0, bottom); g2.addColorStop(0, `rgba(${lite},0)`); g2.addColorStop(1, `rgba(${lite},.75)`);
+    ctx.filter = "blur(4px)"; ctx.fillStyle = g2; roundRect(x - 10 * k, -20, 20 * k, bottom + 20, 10 * k); ctx.fill();
+    ctx.filter = "none"; ctx.restore();
+  }
+
+  // 작은 화면(휴대폰)에서는 지도 위 글자·표시가 너무 작아지므로 화면에 보이는 크기에 맞춰 키움 (최대 1.8배)
+  let TS = 1;
+  function draw(time) {
+    TS = Math.max(1, Math.min(1.8, 0.625 * W / (cv.clientWidth || W)));
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    if (st && st.shake > 0) ctx.translate((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+    // 배경 격자
+    ctx.strokeStyle = "rgba(44,35,102,.35)"; ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    // 노선
+    LINES.forEach((l) => {
+      ctx.strokeStyle = l.color; ctx.lineWidth = 10; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.shadowColor = l.color; ctx.shadowBlur = 12; ctx.globalAlpha = 0.75;
+      ctx.beginPath(); l.pts.forEach(([c, r], i) => (i ? ctx.lineTo(px(c), py(r)) : ctx.moveTo(px(c), py(r)))); ctx.stroke();
+    });
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    // 역과 여유
+    nodes.forEach((n, k) => {
+      const x = px(n.c), y = py(n.r), transfer = n.lines.size > 1;
+      ctx.fillStyle = "#0A0B1E"; ctx.strokeStyle = "#F2F4FF"; ctx.lineWidth = transfer ? 4 : 3;
+      ctx.beginPath(); ctx.arc(x, y, transfer ? 11 : 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    });
+    if (st) st.seats.forEach((k) => {
+      const n = nodes.get(k), s = 1 + 0.08 * Math.sin(time / 180);
+      ctx.save(); ctx.translate(px(n.c), py(n.r)); ctx.scale(s, s); pill(0, 0, "여유", "#39FFB0", "#0A0B1E", 14 * TS, true); ctx.restore();
+    });
+    if (!st) { ctx.restore(); return; }
+    const g = nodes.get(st.goal), gx = px(g.c), gy = py(g.r);
+    drawGoal(gx, gy, time, Math.min(TS, 1.5));
+    // 혼잡 열차
+    st.trains.forEach((tr) => {
+      const [x, y, dx, dy] = trainXY(tr);
+      if (dx || dy) tr.ang = Math.atan2(dy * tr.dir, dx * tr.dir);
+      drawTrain(tr, x, y, st.slow > 0);
+    });
+    // 나: 역 위에서 통통, 움직일 때는 앞으로 기울지 않고 미끄러지듯
+    const [x, y] = playerXY();
+    const blink = st.invuln > 0 && st.hits > 0 && Math.floor(time / 90) % 2;
+    const moving = !!st.p.to, bob = !moving && !(st.intro > 0) ? Math.abs(Math.sin(time / 260)) * 4 : moving ? Math.abs(Math.sin(time / 70)) * 2 : 0;
+    const mood = st.invuln > 0 && st.hits > 0 ? "pain" : st.result ? "happy" : "idle";
+    drawMe(x, y + 8, 0.36 * Math.min(TS, 1.5), mood, blink ? 0.3 : 1, st.p.dir === "right", bob);
+    // 시작 연출: 화면이 어두워지고, 분홍 빛기둥(나)과 초록 빛기둥(목적지)이 위에서 내려옴 → 3·2·1·출발!
+    if (st.intro > 0) {
+      const el = INTRO - st.intro, out = st.intro < 0.6 ? (0.6 - st.intro) / 0.6 : 0, k = Math.min(TS, 1.5);
+      ctx.save(); ctx.globalAlpha = 1 - out;
+      ctx.fillStyle = "rgba(4,4,16,.74)"; ctx.beginPath(); ctx.rect(0, 0, W, H);
+      const hole = 64 * k;
+      ctx.moveTo(x + hole, y - 20); ctx.arc(x, y - 20, hole, 0, Math.PI * 2, true);
+      ctx.moveTo(gx + hole, gy - 16); ctx.arc(gx, gy - 16, hole, 0, Math.PI * 2, true);
+      ctx.fill("evenodd");
+      ctx.setLineDash([10, 10]); ctx.lineDashOffset = -time / 30; ctx.strokeStyle = "rgba(242,244,255,.7)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.restore();
+      const ease = (v) => (v < 0.5 ? 2 * v * v : 1 - Math.pow(-2 * v + 2, 2) / 2);
+      const d1 = ease(Math.min(1, el / 0.4)), d2 = ease(Math.min(1, Math.max(0, (el - 0.15) / 0.4)));
+      const lift = (b) => (out > 0 ? b * (1 - out) : b);
+      lightBeam(x, lift((y + 8) * d1), "255,46,151", "255,215,238", 1 - out * 0.5, k);
+      lightBeam(gx, lift((gy + 6) * d2), "57,255,176", "210,255,236", 1 - out * 0.5, k * 0.85);
+      drawGoal(gx, gy, time, k);
+      drawMe(x, y + 8, 0.36 * k, "idle", 1, st.p.dir === "right", 0);
+      if (el > 0.45) {
+        ctx.save(); ctx.globalAlpha = Math.min(1, (el - 0.45) / 0.2) * (1 - out);
+        pill(Math.min(W - 70 * k, Math.max(70 * k, x)), y < 140 * k ? y + 44 * k : y - 78 * k, "나 · 출발", "#FF2E97", "#FFFFFF", 16 * k, false);
+        pill(Math.min(W - 110 * k, Math.max(110 * k, gx)), gy + 46 * k > H - 20 ? gy - 96 * k : gy + 46 * k, `목적지 · 최단 ${st.shortest}역`, "#39FFB0", "#0A0B1E", 16 * k, false);
+        ctx.restore();
+      }
+      const n = Math.ceil((st.intro - 0.6) / 0.8), fs = Math.max(40, Math.min(72, W * 0.08)) * Math.min(TS, 1.3);
+      ctx.save(); ctx.globalAlpha = n > 0 ? 1 : 1 - out * 0.8;
+      ctx.font = n > 0 ? `400 ${fs}px ${PIXEL}` : `900 ${fs}px ${FONT}`; ctx.fillStyle = "#F2F4FF"; ctx.shadowColor = "#22E5FF"; ctx.shadowBlur = 24;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(n > 0 ? String(n) : "출발!", W / 2, H * 0.42);
+      ctx.restore();
+    }
+    // 도착 점수표
+    if (st.result) {
+      const r = st.result, k = Math.min(TS, 1.3), bw = Math.min(W - 40, 520 * k), rh = 34 * k, bh = 70 * k + r.rows.length * rh + 50 * k, bx = (W - bw) / 2, by = (H - bh) / 2;
+      ctx.fillStyle = "rgba(18,14,46,.96)"; roundRect(bx, by, bw, bh, 20); ctx.fill();
+      ctx.save(); ctx.shadowColor = "#39FFB0"; ctx.shadowBlur = 16; ctx.strokeStyle = "#39FFB0"; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      ctx.fillStyle = "#39FFB0"; ctx.font = `900 ${24 * k}px ${FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("혼잡 열차를 피해 목적지 도착!", W / 2, by + 36 * k);
+      ctx.font = `700 ${16 * k}px ${FONT}`;
+      r.rows.forEach(([lab, v], i) => {
+        const yy = by + 80 * k + i * rh;
+        ctx.textAlign = "left"; ctx.fillStyle = "#A9A6D6"; ctx.fillText(lab, bx + 28 * k, yy, bw * 0.7);
+        ctx.textAlign = "right"; ctx.fillStyle = v >= 0 ? "#39FFB0" : "#FF3B5C"; ctx.fillText((v >= 0 ? "+" : "") + v, bx + bw - 28 * k, yy);
+      });
+      const ty = by + 80 * k + r.rows.length * rh + 10 * k;
+      ctx.strokeStyle = "#2C2366"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx + 28 * k, ty - 14 * k); ctx.lineTo(bx + bw - 28 * k, ty - 14 * k); ctx.stroke();
+      ctx.font = `900 ${21 * k}px ${FONT}`; ctx.textAlign = "left"; ctx.fillStyle = "#F2F4FF"; ctx.fillText("합계", bx + 28 * k, ty + 6 * k);
+      ctx.textAlign = "right"; ctx.fillStyle = r.total >= 0 ? "#22E5FF" : "#FF3B5C"; ctx.font = `400 ${16 * k}px ${PIXEL}`; ctx.fillText((r.total >= 0 ? "+" : "") + r.total, bx + bw - 28 * k, ty + 6 * k);
+    }
+    // 일시 정지 화면
+    if (st.hold) {
+      ctx.fillStyle = "rgba(6,6,20,.72)"; ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "#F2F4FF"; ctx.font = `900 ${44 * Math.min(TS, 1.4)}px ${FONT}`; ctx.fillText("일시 정지", W / 2, H / 2 - 18);
+      ctx.fillStyle = "#A9A6D6"; ctx.font = `700 ${18 * Math.min(TS, 1.4)}px ${FONT}`; ctx.fillText(isTouch ? "화면을 누르면 이어서 해요" : "화면을 누르거나 P 키로 이어서 해요", W / 2, H / 2 + 28);
+    }
+    ctx.restore();
+  }
+
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (st && !st.over && !st.paused && !st.hold) {
+      if (st.pause > 0) { st.pause -= dt; }
+      else if (st.intro > 0) {
+        const cd = (v) => Math.ceil((v - 0.6) / 0.8), el0 = INTRO - st.intro, before = cd(st.intro); st.intro -= dt; const after = cd(st.intro);
+        if (el0 < 0.4 && INTRO - st.intro >= 0.4) sfx.land();                 // 빛이 바닥에 닿는 '팅'
+        if (after !== before && before > 0) { if (after > 0) sfx.count(); else { sfx.go(); if (!BGM.on) bgmStart(); robot("ok", `출발! 목적지까지 최단 <b>${st.shortest}역</b>. <span class="lv l1g">여유</span>를 지나면 혼잡 열차가 느려져요.`); } }
+      }
+      else update(dt);
+    }
+    if (st) soundTick(st.level, Math.max(0, st.timeLeft) / 45, !st.over && !st.paused && !st.hold && !(st.pause > 0) && !(st.intro > 0));
+    draw(now);
+    raf = requestAnimationFrame(loop);
+  }
+
+  function start() {
+    audioInit(); wakeAudio(); bgmStop(); BGM.hurry = false; sfx.beam();
+    st = { level: 1, score: 0, hearts: 3, over: false, pause: 0, paused: false, hold: false };
+    $("pauseBtn").textContent = "⏸ 일시 정지"; $("pauseBtn").setAttribute("aria-pressed", "false");
+    $("startBtn").textContent = "출발하기";
+    setupLevel();
+    $("intro").hidden = true; $("over").hidden = true;
+    cv.focus && cv.focus();
+  }
+
+  function end() {
+    st.over = true; bgmStop(); BGM.hurry = false; sfx.over();
+    const arrived = st.level - 1, isBest = st.score > 0 && st.score >= best;
+    if (st.score > best) { best = st.score; try { localStorage.setItem("subway-maze-best", String(best)); } catch (e) {} }
+    robot("err", `하트를 다 썼어요. 목적지 <b>${arrived}곳</b>에 도착했어요.`);
+    $("final").textContent = st.score.toLocaleString("ko-KR") + "점";
+    $("overTitle").textContent = arrived > 0 ? `혼잡한 열차를 피해 목적지 ${arrived}곳에 도착했어요` : "혼잡한 노선을 피해 목적지까지 가기, 생각보다 어렵죠?";
+    $("overMsg").textContent = `${st.level}단계 · ` + (isBest ? "최고 기록이에요!" : `최고 기록은 ${best.toLocaleString("ko-KR")}점이에요`);
+    $("shareNote").textContent = ""; offerSave();
+    setTimeout(() => { $("over").hidden = false; $("againBtn").focus(); }, 900);
+  }
+
+  // 순위표: 사람마다 문서 하나(scores/<내 id>)에 최고 기록만 남김
+  let db = null, me = null, myBest = null;
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const DLBL = { easy: "느리게", normal: "보통", hard: "빠르게" };
+  function renderBoard(rows) {
+    $("board").innerHTML = rows.length ? rows.map((r, i) => `<li class="${r.id === me ? "me" : ""}"><span class="rk">${i + 1}</span><span class="nm">${esc(r.name)}${r.id === me ? " (나)" : ""}</span><span class="st">${Number(r.score).toLocaleString("ko-KR")}</span><span class="tm">${r.level}단계</span></li>`).join("")
+      : `<li><span></span><span class="nm" style="color:var(--sub);font-weight:400">아직 남긴 기록이 없어요.</span></li>`;
+  }
+  // 명예의 전당 제목 줄 오른쪽: 내 최고 기록 (기록이 없으면 숨김)
+  function offerSave() {
+    const form = $("saveForm"), note = $("saveNote");
+    if (!db || !me) {
+      form.hidden = true;
+      $("board").innerHTML = best > 0 ? `<li class="me"><span class="rk">★</span><span class="nm">이 기기의 내 최고 기록</span><span class="st">${best.toLocaleString("ko-KR")}</span><span class="tm"></span></li>` : "";
+      note.textContent = db === false ? "사이트에서는 이 기기의 기록만 보여요. 순위표는 서버가 연결되면 열려요." : ""; return;
+    }
+    if (myBest !== null && st.score <= myBest) { form.hidden = true; note.textContent = `내 최고 기록은 ${myBest.toLocaleString("ko-KR")}점이에요.`; return; }
+    form.hidden = false; note.textContent = myBest === null ? "첫 기록이에요. 닉네임을 남겨 보세요." : `내 최고 기록(${myBest.toLocaleString("ko-KR")}점)을 넘었어요!`;
+    try { const n = localStorage.getItem("subway-maze-nick") || ""; $("nick").value = nickProblem(n) ? "" : n; } catch (e) {}
+  }
+  // 닉네임 검사: 쓸 수 있는 글자만, 비속어·혐오 표현·운영자 사칭 금지
+  const BANNED = [
+    "시발","씨발","씨바","시바","쉬발","씨팔","시팔","ㅅㅂ","ㅆㅂ","ㅅㅂㄹ","병신","븅신","빙신","ㅂㅅ","등신","좆","존나","졸라","ㅈㄴ",
+    "개새","개색","개세","새끼","색기","쌔끼","ㅅㄲ","지랄","ㅈㄹ","미친","미친놈","미친년","ㅁㅊ","닥쳐","꺼져","엿먹","염병","호로","후레",
+    "니애미","니엄마","느금","애미","애비","니미","엠창","썅","쌍년","쌍놈","년아","놈아","걸레","창녀","섹스","보지","자지","씹","딸딸",
+    "한남","김치녀","된장녀","틀딱","급식충","맘충","장애새","정신병","찐따","찌질","뒤져","뒤질","죽어","자살","살인",
+    "운영자","관리자","admin","운영진",
+    "fuck","fuk","shit","bitch","btch","sex","dick","pussy","asshole","cunt","nigg","bastard","slut","whore","porn","retard",
+  ];
+  const LEET = { 0: "o", 1: "i", 3: "e", 4: "a", 5: "s", 7: "t", "@": "a", "$": "s" };
+  function nickProblem(name) {
+    if (!name) return "닉네임을 적어 주세요.";
+    if (name.length < 2) return "닉네임은 2자 이상으로 적어 주세요.";
+    if (!/^[가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9 _\-]+$/.test(name)) return "한글, 영문, 숫자, 띄어쓰기, _ - 만 쓸 수 있어요.";
+    const flat = name.toLowerCase().replace(/[013457@$]/g, (c) => LEET[c] || c).replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-z]/g, "");
+    if (BANNED.some((w) => flat.includes(w))) return "쓸 수 없는 말이 들어 있어요. 다른 닉네임을 적어 주세요.";
+    return "";
+  }
+  $("nick").addEventListener("input", () => { const p = nickProblem($("nick").value.trim()); $("saveNote").textContent = $("nick").value && p ? p : ""; });
+  $("saveForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("nick").value.trim().slice(0, 12);
+    const problem = nickProblem(name);
+    if (problem) { $("saveNote").textContent = problem; $("nick").focus(); return; }
+    try { localStorage.setItem("subway-maze-nick", name); } catch (err) {}
+    $("saveForm").hidden = true; $("saveNote").textContent = "저장하는 중…";
+    try {
+      await db.collection("scores").doc(me).set({ name, score: st.score, level: st.level, diff, at: Date.now() });
+      myBest = st.score; $("saveNote").textContent = "명예의 전당에 남겼어요."; sfx.oneUp();
+    } catch (err) {
+      $("saveNote").textContent = "이 링크에서는 명예의 전당에 기록을 남길 수 없어요.";
+    }
+  });
+  // 끝 화면 버튼 주소: 사이트에서는 / · /route · /game(CROSSY METRO), Claude 아티팩트로 열면 미리보기 사이트와 CROSSY METRO 아티팩트를 새 탭으로
+  if (window.claude) {
+    const PREVIEW = "https://claude.ai/artifact/5Z7MAccnX46QeEqWuiXRti", OTHER = "https://claude.ai/artifact/HAQJ9ZBk1V82q2PaWAX1MV";
+    document.querySelectorAll(".site-home,.site-route,.site-other").forEach((a) => { a.href = a.classList.contains("site-other") ? OTHER : PREVIEW; a.target = "_blank"; a.rel = "noopener noreferrer"; });
+  }
+  // 명예의 전당 저장소: ① Claude 아티팩트로 열면 아티팩트 저장소 ② SCORE_API에 서버 주소를 적으면 우리 서버
+  //  ③ 둘 다 없으면(지금 사이트) 순위표 없이 이 기기의 내 최고 기록만 보여 줌
+  const SCORE_API = "";   // 예: "https://easy-nav-api.example.com/api" · 서버에 순위표 기능(GET·POST /scores)을 만든 뒤 적습니다
+  const loadApiBoard = () => fetch(SCORE_API + "/scores?limit=10").then((r) => r.json()).then((rows) =>
+    renderBoard(rows.filter((r) => typeof r.score === "number" && r.name).map((r) => (nickProblem(String(r.name).slice(0, 12)) ? { ...r, name: "익명 승객" } : r)))).catch(() => {});
+  const apiDb = { collection: () => ({ doc: (id) => ({
+    set: (d) => fetch(SCORE_API + "/scores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...d }) })
+      .then((r) => { if (!r.ok) throw new Error("save"); loadApiBoard(); }),
+  }) }) };
+  (async () => {
+    if (!window.claude || !window.claude.use) {
+      if (!SCORE_API) { db = false; return; }
+      try { me = localStorage.getItem("subway-maze-player") || ""; if (!me) { me = "p" + Math.random().toString(36).slice(2, 12); localStorage.setItem("subway-maze-player", me); } } catch (e) { me = "p" + Math.random().toString(36).slice(2, 12); }
+      db = apiDb; loadApiBoard(); return;
+    }
+    const [d, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if (!d || !user) { db = false; return; }
+    me = await user.id(); db = d;
+    if (!me) { db = false; return; }
+    db.collection("scores").orderBy("score", "desc").limit(10).onSnapshot((snap) => {
+      const rows = snap.docs.map((x) => ({ id: x.id, ...x.data() })).filter((r) => typeof r.score === "number" && r.name)
+        .map((r) => (nickProblem(String(r.name).slice(0, 12)) ? { ...r, name: "익명 승객" } : r)).sort((a, b) => b.score - a.score).slice(0, 10);
+      renderBoard(rows);
+    }, () => {});
+    try { const mine = await db.collection("scores").doc(me).get(); if (mine.exists) myBest = mine.data().score; } catch (e) {}
+  })();
+
+  // 조작: 키보드, 화면 터치(주인공 기준 방향), 화면 밀기
+  const KEY = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right" };
+  addEventListener("keydown", (e) => {
+    if (!$("intro").hidden || !$("over").hidden) {
+      if (e.key === "Enter" && !["BUTTON", "INPUT", "A"].includes(document.activeElement?.tagName)) { e.preventDefault(); (!$("over").hidden ? $("againBtn") : $("startBtn")).click(); }
+      return;
+    }
+    const d = KEY[e.key]; if (d && st && !st.over && !st.hold) { st.p.want = d; e.preventDefault(); }
+  });
+  // 터치: 화면 가운데를 기준으로 누른 쪽 가장자리 방향으로 움직임 (오른쪽 가장자리 근처 → 오른쪽, 위쪽 → 위)
+  //  대각선 근처(경계 ±25° 안)를 누르면 두 방향 중 '지금 역에서 실제로 갈 수 있는 쪽'을 골라 줌 → 경계를 정확히 안 맞춰도 됨
+  //  화면을 밀어도(스와이프) 그 방향으로 움직임. 버튼·입력 칸·안내 창을 누를 때는 무시. 누른 방향은 화살표로 잠깐 보여 줌
+  let sx = 0, sy = 0;
+  const skipTouch = (t) => t.closest && t.closest("button, a, input, select, .overlay");
+  const ARROW = { up: "▲", down: "▼", left: "◀", right: "▶" };
+  const canGo = (d) => { const at = st.p.to || st.p.at; return !!step(at, d); };
+  function tapFx(d) {
+    const el = document.createElement("div"); el.className = "tapfx"; el.textContent = ARROW[d];
+    const m = 48; el.style.left = (d === "left" ? m : d === "right" ? innerWidth - m : innerWidth / 2) + "px"; el.style.top = (d === "up" ? m + 40 : d === "down" ? innerHeight - m : innerHeight / 2) + "px";
+    document.body.appendChild(el); setTimeout(() => el.remove(), 400);
+  }
+  addEventListener("pointerdown", (e) => { sx = e.clientX; sy = e.clientY; });
+  addEventListener("pointerup", (e) => {
+    if (!st || st.over || st.hold || st.paused || skipTouch(e.target)) return;
+    let dx = e.clientX - sx, dy = e.clientY - sy;
+    const tap = Math.hypot(dx, dy) < 18;
+    if (tap) {
+      dx = (e.clientX - innerWidth / 2) / innerWidth; dy = (e.clientY - innerHeight / 2) / innerHeight;
+      if (Math.hypot(dx, dy) < 0.02) return;
+    }
+    const h = dx > 0 ? "right" : "left", v = dy > 0 ? "down" : "up";
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    let d = ax > ay ? h : v;
+    if (tap && Math.min(ax, ay) / Math.max(ax, ay) > 0.47) {   // 대각선 근처: 갈 수 있는 쪽 우선
+      const other = d === h ? v : h;
+      if (!canGo(d) && canGo(other)) d = other;
+    }
+    st.p.want = d;
+    if (e.pointerType !== "mouse") tapFx(d);
+  });
+  // 휴대폰 세로 화면: 출발할 때 전체 화면 + 가로 고정을 시도 (안드로이드 크롬 등 지원 브라우저만, 아이폰은 직접 돌려야 함)
+  function goLandscape() {
+    if (!matchMedia("(pointer:coarse) and (orientation:portrait)").matches) return;
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req || document.fullscreenElement) return;
+    try { Promise.resolve(req.call(el)).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape")).catch(() => {}); } catch (e) {}
+  }
+  $("startBtn").addEventListener("click", () => { if (st && !st.over && st.paused) { st.paused = false; $("intro").hidden = true; } else start(); });
+  const setPause = (on) => {
+    if (!st || st.over) return;
+    st.hold = on;
+    $("pauseBtn").textContent = on ? "▶ 계속하기" : "⏸ 일시 정지";
+    $("pauseBtn").setAttribute("aria-pressed", String(on));
+    if (ac) on ? ac.suspend() : ac.resume();
+    if (on) robot("search", "잠깐 멈췄어요. 화면을 누르거나 P 키로 이어서 해요.");
+  };
+  $("pauseBtn").addEventListener("click", () => setPause(!(st && st.hold)));
+  $("muteBtn").addEventListener("click", () => { audioInit(); if (ac && ac.state !== "running" && !(st && st.hold)) ac.resume(); setMute(!muted); });
+  setMute(muted);
+  addEventListener("keydown", (e) => { if ((e.key === "m" || e.key === "M") && $("intro").hidden) setMute(!muted); });
+  addEventListener("keydown", (e) => { if ((e.key === "p" || e.key === "P" || e.key === "Escape") && st && !st.over && $("intro").hidden) { setPause(!st.hold); e.preventDefault(); } });
+  addEventListener("blur", () => setPause(true));   // 다른 창으로 가면 자동으로 멈춤
+  cv.addEventListener("click", () => { if (st && st.hold) setPause(false); });
+  $("helpBtn").addEventListener("click", () => { if (st && !st.over) { st.paused = true; $("startBtn").textContent = "이어서 하기"; } $("intro").hidden = false; $("startBtn").focus(); });
+  $("againBtn").addEventListener("click", start);
+  // 점수 공유: 휴대폰은 기본 공유 창(카카오톡·문자 등), 없으면 문구와 링크를 복사
+  //  링크는 게임 주소(/game). Claude 미리보기에서 열면 배포 사이트 주소로
+  const SITE_URL = "https://easy-nav-iota.vercel.app";
+  $("shareBtn").addEventListener("click", async () => {
+    const base = !window.claude && /^https?:$/.test(location.protocol) ? location.origin : SITE_URL;
+    const url = base + "/game/metro-man";
+    const text = "METRO-MAN에서 " + (st ? st.score : 0).toLocaleString("ko-KR") + "점 달성! 혼잡 열차를 피해 당신은 몇 단계까지 갈 수 있을까요?";
+    const note = $("shareNote"); note.textContent = "";
+    if (navigator.share) {
+      try { await navigator.share({ title: "METRO-MAN: Fast or Comfy?", text, url }); return; }
+      catch (err) { if (err && err.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(text + "\n" + url); note.textContent = "공유 문구와 링크를 복사했어요."; }
+    catch (err) { note.textContent = url; }
+  });
+  // 홈으로: 사이트에서 왔으면 뒤로 가기와 똑같이 돌아가고(쇼릴 이어 보기), 주소로 바로 들어왔으면 사이트 홈으로
+  document.querySelectorAll(".site-home").forEach((a) => a.addEventListener("click", (e) => {
+    if (window.claude) return;
+    let fromSite = false;
+    try { fromSite = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (err) { /* 무시 */ }
+    if (fromSite && history.length > 1) { e.preventDefault(); history.back(); }
+  }));
+  // 처음부터: 지금 판을 끝내고(기록 없이) 첫 화면(설명서 + 출발하기)으로
+  $("homeBtn").addEventListener("click", () => {
+    bgmStop(); BGM.hurry = false; if (ac && ac.state !== "running") ac.resume();
+    st = null; fitScreen();
+    $("score").textContent = "0"; $("level").textContent = "1"; $("hearts").textContent = "💚💚💚"; $("timeBar").style.transform = "scaleX(1)"; $("timeNum").textContent = "45"; $("timeChip").classList.remove("low");
+    robot("search", "혼잡 열차를 피해 <b>목적지</b>까지 가장 짧은 길로 가요.");
+    $("pauseBtn").textContent = "⏸ 일시 정지"; $("pauseBtn").setAttribute("aria-pressed", "false");
+    $("startBtn").textContent = "출발하기";
+    $("over").hidden = true; $("intro").hidden = false; $("startBtn").focus();
+  });
+
+  // 한 화면 맞춤: 위(제목·버튼)·아래(안내 문구) 높이를 빼고 남는 높이에 노선도가 꽉 차도록 폭을 정함.
+  //  제목·버튼·노선도·안내 문구가 모두 같은 폭(같은 좌우 여백)에 서고, 아래 여백은 위 여백과 같아짐
+  const wrapEl = document.querySelector(".wrap"), topEl = document.querySelector(".top"), hudEl = document.getElementById("hud"), guideEl = document.getElementById("guide");
+  const stageEl = document.getElementById("stage");
+  function fitScreen() {
+    const cs = getComputedStyle(document.body), padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom), padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const gap = parseFloat(getComputedStyle(wrapEl).rowGap) || 12, maxW = document.documentElement.clientWidth - padX;
+    const availAt = (w) => { wrapEl.style.maxWidth = w + "px"; return innerHeight - padY - topEl.offsetHeight - hudEl.offsetHeight - guideEl.offsetHeight - gap * 3; };
+    // 휴대폰이면 남는 공간의 모양에 맞는 지도를 고름 (컴퓨터는 늘 기본 지도)
+    const aspect = maxW / Math.max(1, availAt(Math.min(1600, maxW)));
+    const mobile = matchMedia("(pointer:coarse)").matches;
+    wantLayout = mobile ? "tall" : "desk";   // 휴대폰은 세로 화면 전용(세로 지도), 컴퓨터는 기본 지도
+    if (mobile) {
+      // 세로 지도 폭: 남는 공간 비율에 맞춰 가로를 늘려 좌우 여백을 줄임 (너무 넓어지지 않게 560~760)
+      const availH = Math.max(1, availAt(maxW));
+      if (!st || st.over) LAYOUTS.tall.W = Math.round(Math.max(560, Math.min(760, LAYOUTS.tall.H * maxW / availH)));
+      if (st && !st.over && matchMedia("(orientation:landscape)").matches && !st.hold) setPause(true);
+    }
+    if (!st || st.over) applyLayout(wantLayout);
+    if (layout === "tall") {
+      // 세로 지도: 제목·버튼은 화면 폭 그대로, 지도만 남는 높이에 맞춰 가운데
+      const avail = availAt(maxW);
+      wrapEl.style.maxWidth = maxW + "px";
+      stageEl.style.width = Math.floor(Math.max(240, Math.min(maxW, avail * W / H))) + "px"; stageEl.style.margin = "0 auto";
+      return;
+    }
+    stageEl.style.width = ""; stageEl.style.margin = "";
+    let w = Math.min(1600, maxW);
+    for (let i = 0; i < 4; i++) {
+      const avail = availAt(w);
+      const nw = Math.max(300, Math.min(1600, maxW, avail * W / H));
+      if (Math.abs(nw - w) < 1) break;
+      w = nw;
+    }
+    wrapEl.style.maxWidth = Math.floor(w) + "px";
+  }
+
+  // ───────── AI 안내 도우미 (우리 지하철 로봇의 얼굴) ─────────
+  // AI 안내 도우미 얼굴: 확정본 지하철 로봇(블록을 쌓아 그림)에서 앞머리만 잘라 그림. 몸통·바퀴는 생략
+  //  face: work(찾는 중, 보라 점 3개) · done(안내 완료, 그린 '-') · error(오류, 핑크 x x)
+  const ROBOT_HEAD=(()=>{
+    const SIL="#C7CBE0",ROOF="#8E94B8",NAVY="#2B3A7E",DARK="#05070F",PK="#FF2E97",PU="#9B5CFF",GR="#39FFB0",LT="#FFF4C2";
+    const FACE={work:[PU,[[3,6],[5,6],[7,6]]],done:[GR,[[2,6],[2,7],[8,6],[8,7],[4,5],[5,5],[6,5]]],error:[PK,[[2,7],[4,7],[3,6],[2,5],[4,5],[6,7],[8,7],[7,6],[6,5],[8,5]]]};
+    const shade=(hex,k)=>{const n=parseInt(hex.slice(1),16),f=v=>Math.round(k>0?v+(255-v)*k:v*(1+k));return `rgb(${f(n>>16)},${f(n>>8&255)},${f(n&255)})`;};
+    function blocks(face){
+      const V=new Map(),set=(x,y,z,c,g)=>V.set(`${x},${y},${z}`,{x,y,z,c,g}),del=(x,y,z)=>V.delete(`${x},${y},${z}`);
+      const W=10,T=9;
+      for(let x=0;x<=W;x++)for(let y=0;y<=1;y++)for(let z=1;z<=T;z++)set(x,y,z,z===1?"#9EA3C2":z<=3?NAVY:SIL);
+      set(W,0,1,PK,1);set(W,1,1,PK,1);set(W,0,4,PU,1);set(W,1,4,PU,1);
+      for(let x=0;x<=W;x++)set(x,0,1,PK,1);
+      for(let x=1;x<=W-1;x++)for(let z=4;z<=8;z++)set(x,0,z,DARK);
+      set(1,0,2,LT,1);set(W-1,0,2,LT,1);
+      for(let y=0;y<=1;y++){del(0,y,T);del(W,y,T);}
+      for(let x=0;x<=W;x++)del(x,0,T);
+      for(let z=1;z<=T;z++){del(0,0,z);del(W,0,z);}
+      for(let x=2;x<=W-2;x++)set(x,1,T+1,ROOF);
+      // V자 안테나 (좌우 반전해 그리므로 색을 바꿔 둠 → 화면에서 왼쪽 핑크, 오른쪽 그린)
+      set(5,1,T+2,PU,1);
+      for(const[x,z,c]of[[5,12,PU],[4,13,GR],[3,14,GR],[2,15,GR],[6,13,PK],[7,14,PK],[8,15,PK]])set(x,1,z,c,1);
+      const[c,px]=FACE[face]||FACE.done; px.forEach(([x,z])=>set(x,0,z,c,1));
+      return[...V.values()];
+    }
+    const cache={};
+    return function(face){
+      if(cache[face]) return cache[face];
+      const B=blocks(face),has=new Set(B.map(b=>`${b.x},${b.y},${b.z}`)),H=(x,y,z)=>has.has(`${x},${y},${z}`);
+      const P=(x,y,z)=>[x*10+y*6.2,-z*10-y*3.6];
+      let out="",glow="",a=1e9,b=-1e9,c=1e9,d=-1e9;
+      const poly=(pts,fill,g)=>{for(const[p,q]of pts){a=Math.min(a,p);b=Math.max(b,p);c=Math.min(c,q);d=Math.max(d,q);}
+        const s=pts.map(p=>p.map(v=>v.toFixed(1)).join(",")).join(" ");out+=`<polygon points="${s}" fill="${fill}" stroke="${fill}" stroke-width=".4"/>`;if(g)glow+=`<polygon points="${s}" fill="${fill}"/>`;};
+      for(const v of B.sort((p,q)=>q.y-p.y||p.x-q.x||p.z-q.z)){const{x,y,z,c:col,g}=v;
+        if(!H(x,y,z+1))poly([P(x,y,z+1),P(x+1,y,z+1),P(x+1,y+1,z+1),P(x,y+1,z+1)],shade(col,.25),g);
+        if(!H(x+1,y,z))poly([P(x+1,y,z),P(x+1,y+1,z),P(x+1,y+1,z+1),P(x+1,y,z+1)],shade(col,-.32),g);
+        if(!H(x,y-1,z))poly([P(x,y,z),P(x+1,y,z),P(x+1,y,z+1),P(x,y,z+1)],col,g);}
+      const pad=6,id="rh"+face;
+      return cache[face]=`<svg viewBox="${(a-pad).toFixed(1)} ${(c-pad).toFixed(1)} ${(b-a+pad*2).toFixed(1)} ${(d-c+pad*2).toFixed(1)}" style="transform:scaleX(-1)" aria-hidden="true"><defs><filter id="${id}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter></defs>${out}<g filter="url(#${id})" opacity=".85">${glow}</g></svg>`;
+    };
+  })();
+  const face = $("face"), FACEOF = { search: "work", ok: "done", err: "error" };
+  function robot(state, html) {
+    const f = FACEOF[state] || "done"; if (face.dataset.f !== f) { face.innerHTML = ROBOT_HEAD(f); face.dataset.f = f; }
+    $("bubble").classList.toggle("err", state === "err");
+    if (html) $("msg").innerHTML = html;
+  }
+  robot("search");
+  const isTouch = matchMedia("(pointer:coarse)").matches;
+  if (isTouch) document.documentElement.classList.add("touch");
+  document.querySelectorAll("[data-icon=hero]").forEach((el) => {
+    el.innerHTML = '<span style="position:relative;display:block;width:44px;height:48px"><span style="position:absolute;left:6px;bottom:0;width:32px;height:9px;border-radius:50%;background:radial-gradient(closest-side,rgba(150,10,80,.95),rgba(255,46,151,.8) 50%,rgba(255,46,151,0))"></span><svg width="40" height="45" viewBox="0 0 120 136" style="position:absolute;left:2px;bottom:3px;filter:drop-shadow(1.5px 0 0 #0A0B1E) drop-shadow(-1.5px 0 0 #0A0B1E) drop-shadow(0 0 6px #FF2E97)">' + ME.map(([x, y, w, h, c]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`).join("") + '<rect x="45" y="37" width="7" height="8" fill="#241A44"/><rect x="67" y="37" width="7" height="8" fill="#241A44"/><rect x="54" y="50" width="12" height="3" fill="#241A44"/></svg></span>';
+  });
+  $("best").textContent = best.toLocaleString("ko-KR");
+  /*DBG*/
+  addEventListener("resize", fitScreen); fitScreen();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitScreen);
+  last = performance.now(); raf = requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
