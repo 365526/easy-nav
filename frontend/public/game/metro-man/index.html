@@ -230,6 +230,9 @@ kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line
 .diff button{min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .diff button[aria-pressed="true"]{border-color:var(--cyan);background:#22E5FF22;box-shadow:0 0 14px #22E5FF55}
 .tapfx{position:fixed;z-index:60;pointer-events:none;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:900;color:#0A0B1E;background:#22E5FFcc;box-shadow:0 0 24px #22E5FF;animation:tapfx .35s ease-out forwards}
+.swfx{position:fixed;z-index:60;pointer-events:none;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;display:grid;place-items:center;font-size:18px;font-weight:900;color:#0A0B1E;background:#22E5FFdd;box-shadow:0 0 16px #22E5FF;animation:tapfx .38s ease-out forwards}
+.swhint{position:fixed;z-index:60;pointer-events:none;transform:translate(-50%,-50%);white-space:nowrap;padding:8px 16px;border-radius:999px;background:rgba(10,11,30,.92);border:1px solid var(--cyan);color:var(--cyan);font-size:14px;font-weight:900;animation:swhint 1.6s ease-out forwards}
+@keyframes swhint{0%{opacity:0}10%,75%{opacity:1}100%{opacity:0}}
 @keyframes tapfx{from{opacity:.95;transform:scale(.7)}to{opacity:0;transform:scale(1.15)}}
 @media (max-width:560px){
   .hud .goalchip{display:none}
@@ -264,7 +267,7 @@ kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line
     <span class="chip bestchip">최고 <span class="num" id="best">0</span></span>
   </div>
 
-  <div class="stage" id="stage" tabindex="0" aria-label="게임 화면 (방향키로 조작)">
+  <div class="stage" id="stage" tabindex="0" aria-label="게임 화면 (방향키나 화면 밀기로 조작)">
     <canvas id="cv" width="960" height="560" aria-label="METRO-MAN 게임 화면: 노선도 위에서 혼잡한 열차를 피해 목적지역으로 이동하는 게임"></canvas>
   </div>
 
@@ -291,7 +294,7 @@ kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line
     <div class="rule"><b>단계별 점수</b><dl><dt>도착</dt><dd>1단계 +300, 단계마다 +100씩 커져요</dd><dt>거리</dt><dd>최단 길보다 한 역 더 돌 때마다 −10</dd><dt>시간</dt><dd>기준 시간보다 빠르면 1초에 +15, 늦으면 −15</dd><dt>하트</dt><dd>남은 하트 하나에 +50</dd></dl></div>
     <div class="diff" role="group" aria-label="열차 빠르기"><span>열차 빠르기</span><button type="button" data-diff="easy" aria-pressed="false">느리게</button><button type="button" data-diff="normal" aria-pressed="true">보통</button><button type="button" data-diff="hard" aria-pressed="false">빠르게</button></div>
     <div class="keys"><span><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>이동 (WASD도 돼요)</span><span><kbd>P</kbd>멈춤</span><span><kbd>M</kbd>소리</span></div>
-    <div class="padhint"><p style="font-size:12.5px">가고 싶은 쪽 화면을 누르거나, 그쪽으로 밀어요</p></div>
+    <div class="padhint"><p style="font-size:12.5px">화면을 가고 싶은 방향으로 <b>밀어요</b> · 갈림길 전에 미리 밀어 두면 그 길로 꺾어요</p></div>
     <button class="btn start" id="startBtn" type="button">출발하기</button>
     <a class="backlink site-home" href="/"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>홈으로</a>
   </div>
@@ -589,7 +592,7 @@ kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line
     hud();
   }
 
-  let best = 0; try { best = Number(localStorage.getItem("subway-maze-best") || 0); } catch (e) {}
+  let best = 0, bestLv = 0; try { best = Number(localStorage.getItem("subway-maze-best") || 0); bestLv = Number(localStorage.getItem("subway-maze-best-lv") || 0); } catch (e) {}
   function hud() {
     $("score").textContent = st.score.toLocaleString("ko-KR"); $("level").textContent = st.level; $("best").textContent = Math.max(best, st.score).toLocaleString("ko-KR");
     $("hearts").textContent = "💚".repeat(Math.max(0, st.hearts)) + "🤍".repeat(Math.max(0, 3 - st.hearts));
@@ -926,7 +929,7 @@ kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line
   function end() {
     st.over = true; bgmStop(); BGM.hurry = false; sfx.over();
     const arrived = st.level - 1, isBest = st.score > 0 && st.score >= best;
-    if (st.score > best) { best = st.score; try { localStorage.setItem("subway-maze-best", String(best)); } catch (e) {} }
+    if (st.score > best) { best = st.score; bestLv = st.level; try { localStorage.setItem("subway-maze-best", String(best)); localStorage.setItem("subway-maze-best-lv", String(bestLv)); } catch (e) {} }
     robot("err", `하트를 다 썼어요. 목적지 <b>${arrived}곳</b>에 도착했어요.`);
     $("final").textContent = st.score.toLocaleString("ko-KR") + "점";
     $("overTitle").textContent = arrived > 0 ? `혼잡한 열차를 피해 목적지 ${arrived}곳에 도착했어요` : "혼잡한 노선을 피해 목적지까지 가기, 생각보다 어렵죠?";
@@ -1029,37 +1032,59 @@ kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line
     }
     const d = KEY[e.key]; if (d && st && !st.over && !st.hold) { st.p.want = d; e.preventDefault(); }
   });
-  // 터치: 화면 가운데를 기준으로 누른 쪽 가장자리 방향으로 움직임 (오른쪽 가장자리 근처 → 오른쪽, 위쪽 → 위)
-  //  대각선 근처(경계 ±25° 안)를 누르면 두 방향 중 '지금 역에서 실제로 갈 수 있는 쪽'을 골라 줌 → 경계를 정확히 안 맞춰도 됨
-  //  화면을 밀어도(스와이프) 그 방향으로 움직임. 버튼·입력 칸·안내 창을 누를 때는 무시. 누른 방향은 화살표로 잠깐 보여 줌
-  let sx = 0, sy = 0;
-  const skipTouch = (t) => t.closest && t.closest("button, a, input, select, .overlay");
+  // 휴대폰 조작: 게임 화면 어디서든 가고 싶은 방향으로 밀기(스와이프)
+  //  손가락이 SWIPE_PX를 넘게 움직이면 손을 떼기 전에도 바로 그 방향을 넣음 → 빠르게 반응
+  //  손을 떼지 않고 다른 방향으로 다시 밀면 그 방향으로 바꿈(ㄱ자로 한 번에 밀기)
+  //  갈 수 없는 방향은 기억해 뒀다가 다음 갈림길에서 꺾음(update의 p.want)
+  //  두드리기만 하면 방향 대신 "밀어서 움직여요" 안내. 버튼·입력 칸·안내 창 위에서는 무시
+  const SWIPE_PX = 22;
+  const skipTouch = (t) => t.closest && t.closest("button, a, input, select, .overlay, .guide");
   const ARROW = { up: "▲", down: "▼", left: "◀", right: "▶" };
-  const canGo = (d) => { const at = st.p.to || st.p.at; return !!step(at, d); };
-  function tapFx(d) {
-    const el = document.createElement("div"); el.className = "tapfx"; el.textContent = ARROW[d];
-    const m = 48; el.style.left = (d === "left" ? m : d === "right" ? innerWidth - m : innerWidth / 2) + "px"; el.style.top = (d === "up" ? m + 40 : d === "down" ? innerHeight - m : innerHeight / 2) + "px";
-    document.body.appendChild(el); setTimeout(() => el.remove(), 400);
+  const DXY = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  let sw = null;
+  // 민 방향: 주인공 바로 옆에 작은 화살표로 잠깐 보여 줌
+  function swipeFx(d) {
+    if (!st || !st.p) return;
+    const [x, y] = playerXY(), r = cv.getBoundingClientRect();
+    const k = r.width / cv.width, gap = 34;
+    const el = document.createElement("div"); el.className = "swfx"; el.textContent = ARROW[d];
+    el.style.left = r.left + x * k + DXY[d][0] * gap + "px"; el.style.top = r.top + y * k + DXY[d][1] * gap + "px";
+    document.body.appendChild(el); setTimeout(() => el.remove(), 380);
   }
-  addEventListener("pointerdown", (e) => { sx = e.clientX; sy = e.clientY; });
-  addEventListener("pointerup", (e) => {
-    if (!st || st.over || st.hold || st.paused || skipTouch(e.target)) return;
-    let dx = e.clientX - sx, dy = e.clientY - sy;
-    const tap = Math.hypot(dx, dy) < 18;
-    if (tap) {
-      dx = (e.clientX - innerWidth / 2) / innerWidth; dy = (e.clientY - innerHeight / 2) / innerHeight;
-      if (Math.hypot(dx, dy) < 0.02) return;
-    }
-    const h = dx > 0 ? "right" : "left", v = dy > 0 ? "down" : "up";
-    const ax = Math.abs(dx), ay = Math.abs(dy);
-    let d = ax > ay ? h : v;
-    if (tap && Math.min(ax, ay) / Math.max(ax, ay) > 0.47) {   // 대각선 근처: 갈 수 있는 쪽 우선
-      const other = d === h ? v : h;
-      if (!canGo(d) && canGo(other)) d = other;
-    }
-    st.p.want = d;
-    if (e.pointerType !== "mouse") tapFx(d);
+  let hintT = 0;
+  function tapHint() {
+    const now = performance.now(); if (now - hintT < 1500) return; hintT = now;
+    const r = $("stage").getBoundingClientRect();
+    const el = document.createElement("div"); el.className = "swhint"; el.textContent = "화면을 가고 싶은 방향으로 밀어서 움직여요";
+    el.style.left = r.left + r.width / 2 + "px"; el.style.top = r.top + 36 + "px"; // 주인공을 가리지 않게 게임 화면 위쪽
+    document.body.appendChild(el); setTimeout(() => el.remove(), 1600);
+  }
+  const playing = () => st && !st.over && !st.hold && !st.paused;
+  function swipeTo(dx, dy) {
+    const d = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    if (sw && sw.last === d) return;
+    if (sw) sw.last = d;
+    st.p.want = d; swipeFx(d);
+  }
+  addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" || skipTouch(e.target)) { sw = null; return; }
+    sw = { x: e.clientX, y: e.clientY, last: null, moved: false };
   });
+  addEventListener("pointermove", (e) => {
+    if (!sw || !playing()) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if (Math.hypot(dx, dy) < SWIPE_PX) return;
+    sw.moved = true; swipeTo(dx, dy);
+    sw.x = e.clientX; sw.y = e.clientY; // 다음 밀기는 여기서부터
+  });
+  addEventListener("pointerup", (e) => {
+    const s0 = sw; sw = null;
+    if (!s0 || !playing()) return;
+    const dx = e.clientX - s0.x, dy = e.clientY - s0.y;
+    if (!s0.moved && Math.hypot(dx, dy) >= SWIPE_PX * 0.6) { sw = s0; swipeTo(dx, dy); sw = null; return; }
+    if (!s0.moved) tapHint();
+  });
+  addEventListener("pointercancel", () => { sw = null; });
   // 휴대폰 세로 화면: 출발할 때 전체 화면 + 가로 고정을 시도 (안드로이드 크롬 등 지원 브라우저만, 아이폰은 직접 돌려야 함)
   function goLandscape() {
     if (!matchMedia("(pointer:coarse) and (orientation:portrait)").matches) return;
@@ -1091,7 +1116,12 @@ kbd{min-width:26px;text-align:center;padding:2px 7px;border:1px solid var(--line
   $("shareBtn").addEventListener("click", async () => {
     const base = !window.claude && /^https?:$/.test(location.protocol) ? location.origin : SITE_URL;
     const url = base + "/game/metro-man";
-    const text = "METRO-MAN에서 " + (st ? st.score : 0).toLocaleString("ko-KR") + "점 달성! 혼잡 열차를 피해 당신은 몇 단계까지 갈 수 있을까요?";
+    // 공유 문구(SHARE_NICK): 명예의 전당에 남긴 닉네임이 있으면 "○○님의", 기록은 이번 판과 이 기기 최고 기록 중 높은 쪽(그 판의 단계와 함께)
+    let nick = ""; try { nick = localStorage.getItem("subway-maze-nick") || ""; } catch (e) {}
+    if (nickProblem(nick)) nick = "";
+    const now = st ? st.score : 0, top = Math.max(best, now), lv = now >= best && st ? st.level : bestLv;
+    const rec = top.toLocaleString("ko-KR") + "점" + (lv ? `(${lv}단계)` : "");
+    const text = (nick ? `${nick}님의 METRO-MAN 최고 기록은 ${rec}이에요.` : `METRO-MAN 최고 기록 ${rec}!`) + " 혼잡한 열차를 피해 당신은 몇 점까지 갈 수 있을까요?";
     const note = $("shareNote"); note.textContent = "";
     if (navigator.share) {
       try { await navigator.share({ title: "METRO-MAN: Fast or Comfy?", text, url }); return; }
