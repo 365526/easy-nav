@@ -4,6 +4,7 @@ import Phrases from "../components/Phrases.jsx";
 import { useApi, LoadState } from "../api.jsx";
 import StationInput from "../components/route/StationInput.jsx";
 import RouteResult from "../components/route/RouteResult.jsx";
+import RouteMap from "../components/route/RouteMap.jsx";
 import AIGuide from "../components/guide/AIGuide.jsx";
 import { DAYS, nextDate } from "../components/route/routeUtils.js";
 
@@ -19,6 +20,7 @@ export default function RouteFinder() {
   };
   const [form, setForm] = useState(asked);
   const [comfort, setComfort] = useState(50); // 0 빠르게 ~ 100 편하게
+  const [showMap, setShowMap] = useState(false); // 노선도에서 고르기 열림
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
 
   const ready = asked.from && asked.to;
@@ -63,6 +65,16 @@ export default function RouteFinder() {
           </button>
           <StationInput id="to" label="도착역" value={form.to} onChange={set("to")} />
         </div>
+
+        <button
+          type="button"
+          aria-expanded={showMap}
+          onClick={() => setShowMap((o) => !o)}
+          className="-mt-2 self-start rounded-full border border-[#2C2366] px-4 py-2 text-[15px] font-bold text-[#22E5FF] hover:border-[#22E5FF]"
+        >
+          🗺 노선도에서 고르기 {showMap ? "▴" : "▾"}
+        </button>
+        {showMap && <RouteMap onPick={(key, name) => set(key)(name)} />}
 
         <div className="grid gap-6 md:grid-cols-2">
           <fieldset className="flex flex-col gap-2">
