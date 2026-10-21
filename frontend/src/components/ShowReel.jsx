@@ -3,7 +3,9 @@ import {
   Search, ArrowRight, RotateCcw, Play, Pause, Volume2, VolumeX,
   Zap, Sofa, Clock, Sparkles, MapPin, Database, Timer, BarChart3,
 } from "lucide-react";
-import { startMiniGame } from "./miniGame.js";
+import { startMiniGame } from "./crossyMini.js";
+import GuideRobot from "./guide/GuideRobot.jsx";
+import { VoxHero, VoxPerson, PixBubble } from "./reelVoxel.jsx";
 
 /* 빨리 갈까, 편하게 갈까? · 45초 모션 쇼릴 (2.5D 아이소메트릭 · 네온)
    - 1280×720 설계 화면을 컨테이너 폭에 맞춰 축소·확대
@@ -199,185 +201,12 @@ const iso = (x, y, z = 0) => [OX + (x - y) * 0.866 * S, OY + (x + y) * 0.5 * S -
 const pts = (...ps) => ps.map((q) => iso(...q).map((v) => v.toFixed(1)).join(",")).join(" ");
 const L = 14, W = 3.6, H = 2.7;
 
-/* ---------- 주인공: 캐주얼 후드 + 목에 건 헤드폰, 20대 남성 ----------
-   발끝이 (0,0), 위쪽이 음수. pose: hang(손잡이) · hangPhone(손잡이+휴대폰) · sit(앉기)
+/* ---------- 주인공 '나'와 다른 승객: 게임과 같은 복셀 그림체 (reelVoxel.jsx) ----------
+   발바닥이 (0,0), 위쪽이 음수. pose: hang·hangPhone(서서 차렷, 휴대폰은 내린 손에) · sit(의자에 앉기)
    mood: stress(지침) · pain(치임) · happy(웃음) */
-function Hero({ pose = "hang", mood = "stress", look = 0, glow = 0, t = 0, rim = C.red }) {
-  const sit = pose === "sit";
-  const up = sit ? 28 : 0;
-  const ink = "#241A44", skin = "url(#hz-skin)", sleeve = "#4070F5", hoodDark = "#2C3CB4", pants = "#1D1A44";
-  const dx = look * 5;
-  const raised = pose === "hang" || pose === "hangPhone";
-  return (
-    <g>
-      {raised && (
-        <g>
-          <line x1="-20" y1="-244" x2="-20" y2="-226" stroke="#8C84D0" strokeWidth="3" />
-          <ellipse cx="-20" cy="-214" rx="8" ry="11" fill="none" stroke="#A79FEA" strokeWidth="3" />
-          <path d="M-22 -128 C -30 -160, -26 -190, -20 -206" stroke={sleeve} strokeWidth="15" fill="none" strokeLinecap="round" />
-          <path d="M-16 -132 C -22 -160, -19 -188, -15 -202" stroke={rim} strokeWidth="2" fill="none" opacity="0.6" />
-          <circle cx="-20" cy="-209" r="7.5" fill={skin} />
-        </g>
-      )}
-      {/* 다리와 신발 */}
-      {sit ? (
-        <g>
-          <rect x="-16" y="-40" width="13" height="36" rx="6" fill={pants} />
-          <rect x="3" y="-40" width="13" height="36" rx="6" fill={pants} />
-          <ellipse cx="-9" cy="-41" rx="11.5" ry="8" fill="#29265A" />
-          <ellipse cx="9" cy="-41" rx="11.5" ry="8" fill="#29265A" />
-        </g>
-      ) : (
-        <g>
-          <rect x="-15" y="-76" width="12" height="72" rx="6" fill={pants} />
-          <rect x="3" y="-76" width="12" height="72" rx="6" fill={pants} />
-        </g>
-      )}
-      <ellipse cx="-9" cy="-4" rx="10" ry="5.5" fill="#ECEEFF" />
-      <ellipse cx="9" cy="-4" rx="10" ry="5.5" fill="#ECEEFF" />
-      <path d="M-18 -1 H-1 M1 -1 H18" stroke={C.cyan} strokeWidth="2" opacity="0.8" />
-
-      <g transform={`translate(0 ${up})`}>
-        {/* 후드 뒷부분 */}
-        <ellipse cx="0" cy="-134" rx="27" ry="11" fill={hoodDark} />
-        {/* 몸통(후드티) */}
-        <path d="M-28 -126 Q-29 -136 -18 -139 L18 -139 Q29 -136 28 -126 L30 -80 Q30 -70 20 -70 L-20 -70 Q-30 -70 -30 -80 Z" fill="url(#hz-hood)" />
-        <path d="M6 -139 L18 -139 Q29 -136 28 -126 L30 -80 Q30 -70 20 -70 L6 -70 Z" fill="#1A1060" opacity="0.28" />
-        <path d="M27 -127 L29.5 -80" stroke={rim} strokeWidth="2.5" opacity="0.75" strokeLinecap="round" />
-        <rect x="-15" y="-98" width="30" height="18" rx="7" fill={hoodDark} opacity="0.7" />
-        <path d="M-18 -139 Q0 -127 18 -139" stroke={hoodDark} strokeWidth="5" fill="none" />
-        <path d="M-6 -134 L-7 -117 M6 -134 L7 -117" stroke="#EEF0FF" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="-7" cy="-116" r="1.8" fill="#EEF0FF" /><circle cx="7" cy="-116" r="1.8" fill="#EEF0FF" />
-
-        {/* 팔 */}
-        {pose === "hang" && (
-          <g>
-            <path d="M24 -128 C 30 -112, 31 -96, 29 -84" stroke={sleeve} strokeWidth="14" fill="none" strokeLinecap="round" />
-            <circle cx="29" cy="-80" r="6.5" fill={skin} />
-          </g>
-        )}
-        {pose === "hangPhone" && (
-          <g>
-            <path d="M24 -128 C 34 -112, 28 -104, 14 -110" stroke={sleeve} strokeWidth="14" fill="none" strokeLinecap="round" />
-            <rect x="-5" y="-140" width="19" height="31" rx="4" fill="#0B1030" stroke="#6B7CFF" strokeWidth="1.5" />
-            <rect x="-3" y="-137" width="15" height="25" rx="2" fill={C.cyan} opacity={0.5 + 0.5 * glow} />
-            <circle cx="11" cy="-111" r="6.5" fill={skin} />
-          </g>
-        )}
-        {sit && (
-          <g>
-            <path d="M-24 -128 C -31 -104, -24 -86, -11 -78" stroke={sleeve} strokeWidth="14" fill="none" strokeLinecap="round" />
-            <path d="M24 -128 C 31 -104, 24 -86, 11 -78" stroke={sleeve} strokeWidth="14" fill="none" strokeLinecap="round" />
-            <rect x="-9" y="-86" width="18" height="11" rx="3" fill="#0B1030" stroke="#6B7CFF" strokeWidth="1.2" />
-            <rect x="-7" y="-84.5" width="14" height="8" rx="1.5" fill={C.cyan} opacity={0.35 + 0.5 * glow} />
-            <circle cx="-9" cy="-76" r="6.5" fill={skin} /><circle cx="9" cy="-76" r="6.5" fill={skin} />
-          </g>
-        )}
-
-        {/* 목 */}
-        <rect x="-6" y="-148" width="12" height="12" rx="4" fill={skin} />
-
-        {/* 머리 */}
-        <circle cx="-22" cy="-163" r="5" fill={skin} />
-        <circle cx="22" cy="-163" r="5" fill={skin} />
-        <circle cx="0" cy="-165" r="23" fill={skin} />
-        <path d="M14 -184 A23 23 0 0 1 21 -156" stroke={rim} strokeWidth="2" fill="none" opacity="0.55" />
-
-        {/* 표정 */}
-        <g transform={`translate(${dx} 3)`} stroke={ink} strokeLinecap="round" fill="none">
-          {mood === "stress" && (
-            <>
-              <path d="M-14 -171 L-5 -176 M14 -171 L5 -176" strokeWidth="2.4" />
-              <ellipse cx="-9" cy="-163" rx="2.6" ry="3" fill={ink} stroke="none" />
-              <ellipse cx="9" cy="-163" rx="2.6" ry="3" fill={ink} stroke="none" />
-              <path d="M-12.5 -166 L-5.5 -165.5 M12.5 -166 L5.5 -165.5" strokeWidth="2" />
-              <path d="M-12 -159 Q-9 -157.5 -6 -159 M12 -159 Q9 -157.5 6 -159" stroke="#B07AA8" strokeWidth="1.3" opacity="0.7" />
-              <path d="M-5 -152 q 2.5 -2.2 5 0 q 2.5 2.2 5 0" strokeWidth="2" />
-            </>
-          )}
-          {mood === "pain" && (
-            <>
-              <path d="M-14 -170 L-4 -176 M14 -170 L4 -176" strokeWidth="2.6" />
-              <path d="M-13 -167 L-6 -163.5 L-13 -160 M13 -167 L6 -163.5 L13 -160" strokeWidth="2.4" />
-              <rect x="-6.5" y="-156" width="13" height="5.5" rx="2.5" fill="#FFFFFF" strokeWidth="1.6" />
-              <path d="M-6 -153.2 H6" strokeWidth="1" />
-            </>
-          )}
-          {mood === "happy" && (
-            <>
-              <path d="M-14 -173 Q-9 -176 -4 -173 M14 -173 Q9 -176 4 -173" strokeWidth="2.2" />
-              <path d="M-13 -162 Q-9 -167 -5 -162 M13 -162 Q9 -167 5 -162" strokeWidth="2.4" />
-              <path d="M-7 -154 Q0 -145 7 -154 Z" fill="#7A1F4A" strokeWidth="1.6" />
-              <ellipse cx="-14" cy="-156" rx="4.5" ry="2.6" fill="#FF7AB6" opacity="0.45" stroke="none" />
-              <ellipse cx="14" cy="-156" rx="4.5" ry="2.6" fill="#FF7AB6" opacity="0.45" stroke="none" />
-            </>
-          )}
-        </g>
-        {/* 캡모자(핑크): 정수리·띠·앞챙을 한 덩어리로 이어 붙임, 머리카락 없음 */}
-        <g transform={`translate(${dx * 0.3} 0)`}>
-          <path d="M-26.5 -167 C -28 -199, 28 -201, 26.5 -167 Q0 -163 -26.5 -167 Z" fill={C.pink} />
-          <path d="M-22 -172 C -23 -191, -8 -197, 0 -195 C -9 -190, -14 -181, -15 -170 Z" fill="#FF8CCB" opacity="0.55" />
-          <path d="M-26.5 -170 Q0 -165.5 26.5 -170 L26.5 -167 Q0 -162.5 -26.5 -167 Z" fill="#C9156F" />
-          <path d={`M-22 -167.5 Q${4 + dx * 0.6} -158 ${33 + dx} -163 Q${35 + dx} -168 26.5 -168.5 Q0 -164 -22 -167.5 Z`} fill="#E01F84" />
-          <path d={`M-20 -166.6 Q${4 + dx * 0.6} -158.6 ${31 + dx} -163.4`} stroke="#9E0F59" strokeWidth="1.2" fill="none" opacity="0.6" />
-        </g>
-        {(mood === "stress" || mood === "pain") && (
-          <path d={`M26 ${-168 + Math.sin(t * 5) * 1.5} q 4 7 0 9 q -4 -2 0 -9 Z`} fill="#BDEBFF" />
-        )}
-        {glow > 0 && <circle cx="0" cy="-165" r="23" fill={C.cyan} opacity={glow * 0.22} />}
-      </g>
-    </g>
-  );
-}
-
-/* ---------- 다른 승객: 얼굴을 생략한 부드러운 덩어리 ---------- */
+const Hero = VoxHero;
 const BODY = ["#2B2560", "#352A6E", "#1F2A5C", "#3A2358", "#26305E", "#40306E"];
-function Person({ c, arm = "down", face = 0, seat = false, rim = C.red, rimA = 0.5, phone = false }) {
-  const up = seat ? 28 : 0;
-  return (
-    <g>
-      {seat ? (
-        <g>
-          <rect x="-14" y="-40" width="11" height="36" rx="5" fill="#15122E" />
-          <rect x="3" y="-40" width="11" height="36" rx="5" fill="#15122E" />
-          <ellipse cx="-8" cy="-41" rx="10" ry="7" fill="#1C1840" /><ellipse cx="8" cy="-41" rx="10" ry="7" fill="#1C1840" />
-        </g>
-      ) : (
-        <g>
-          <rect x="-13" y="-72" width="11" height="68" rx="5" fill="#15122E" />
-          <rect x="2" y="-72" width="11" height="68" rx="5" fill="#15122E" />
-        </g>
-      )}
-      <ellipse cx="-8" cy="-4" rx="9" ry="5" fill="#2A2650" /><ellipse cx="8" cy="-4" rx="9" ry="5" fill="#2A2650" />
-      <g transform={`translate(0 ${up})`}>
-        {arm === "up" && (
-          <g>
-            <line x1="-18" y1="-240" x2="-18" y2="-222" stroke="#6A62B0" strokeWidth="3" />
-            <ellipse cx="-18" cy="-210" rx="7" ry="10" fill="none" stroke="#7E76C8" strokeWidth="3" />
-            <path d="M-20 -124 C -26 -156, -23 -184, -18 -202" stroke={c} strokeWidth="13" fill="none" strokeLinecap="round" />
-            <circle cx="-18" cy="-205" r="6.5" fill="#B98572" />
-          </g>
-        )}
-        <path d="M-25 -124 Q-26 -132 -17 -135 L17 -135 Q26 -132 25 -124 L27 -74 Q27 -66 18 -66 L-18 -66 Q-27 -66 -27 -74 Z" fill={c} />
-        <path d="M5 -135 L17 -135 Q26 -132 25 -124 L27 -74 Q27 -66 18 -66 L5 -66 Z" fill="#0A0820" opacity="0.28" />
-        <path d="M24 -124 L26 -76" stroke={rim} strokeWidth="2" opacity={rimA} strokeLinecap="round" />
-        {arm !== "up" && <path d="M-22 -122 L-26 -82" stroke={c} strokeWidth="12" strokeLinecap="round" />}
-        {phone ? (
-          <g>
-            <path d="M22 -122 C 28 -108, 22 -102, 10 -104" stroke={c} strokeWidth="12" fill="none" strokeLinecap="round" />
-            <rect x="0" y="-120" width="12" height="18" rx="3" fill={C.cyan} opacity="0.8" filter="url(#hz-glow)" />
-          </g>
-        ) : (
-          <path d="M22 -122 L26 -82" stroke={c} strokeWidth="12" strokeLinecap="round" />
-        )}
-        <rect x="-5" y="-144" width="10" height="10" rx="3" fill="#A87562" />
-        <circle cx="0" cy="-156" r="20" fill="#171230" />
-        {face !== 0 && <ellipse cx={face * 9} cy="-152" rx="10" ry="12" fill="#B98572" opacity="0.85" />}
-        <path d="M12 -171 A20 20 0 0 1 19 -146" stroke={rim} strokeWidth="2" fill="none" opacity={rimA * 0.8} />
-      </g>
-    </g>
-  );
-}
+const Person = VoxPerson;
 
 /* ---------- 열차 내부 (아이소메트릭) ---------- */
 const BENCH = [[1.0, 5.0], [6.2, 10.2], [11.4, 13.8]];
@@ -412,7 +241,7 @@ function IsoCar({ t, calm, day, items }) {
     handles.push(
       <g key={x} transform={`rotate(${sw} ${hx} ${hy})`}>
         <line x1={hx} y1={hy} x2={hx} y2={hy + 16} stroke={pal.strap} strokeWidth="2.5" />
-        <ellipse cx={hx} cy={hy + 24} rx="6" ry="8" fill="none" stroke={pal.loop} strokeWidth="2.5" />
+        <rect x={hx - 7} y={hy + 16} width="14" height="16" fill="none" stroke={pal.loop} strokeWidth="3" />
       </g>
     );
   }
@@ -428,6 +257,11 @@ function IsoCar({ t, calm, day, items }) {
       {Array.from({ length: 10 }, (_, i) => 1.4 * (i + 1)).map((x) => {
         const [a1, b1] = iso(x, 0, 0), [a2, b2] = iso(x, W, 0);
         return <line key={x} x1={a1} y1={b1} x2={a2} y2={b2} stroke={pal.tile} strokeWidth="1" />;
+      })}
+      {/* 바닥을 네모 칸으로: 길이 방향 줄도 3줄 */}
+      {Array.from({ length: 3 }, (_, i) => 0.95 * (i + 1)).map((y) => {
+        const [a1, b1] = iso(0, y, 0), [a2, b2] = iso(L, y, 0);
+        return <line key={"y" + y} x1={a1} y1={b1} x2={a2} y2={b2} stroke={pal.tile} strokeWidth="1" />;
       })}
       <line x1={f0x} y1={f0y} x2={f1x} y2={f1y} stroke={floorLine} strokeWidth="2.5" opacity="0.8" filter="url(#hz-glow)" />
       <line x1={e0x} y1={e0y} x2={e1x} y2={e1y} stroke={accent} strokeWidth="2" opacity="0.7" />
@@ -484,54 +318,11 @@ const CROWD = [
 const SEATED = [1.5, 2.5, 3.5, 4.5, 6.7, 7.7, 8.7, 9.7, 11.9, 12.9];
 const HERO = [6.0, 2.2];
 const HERO_SCALE = 0.78;
+const SEAT_Y = 0.2;   // 앉은 사람 위치: 의자 안쪽(벽 쪽)으로 들여 앉힘
 const PUSH = [[1.2, 1], [2.6, -1], [3.8, 1]];
 
-/* 표정 말풍선: 휴대폰 이모지 대신 직접 그린 얼굴 (빨강=싫음, 초록=웃음, 노랑=고민) */
-function MoodFace({ e }) {
-  const ink = "#2A1020";
-  const col = { upset: "#FF5A6E", pain: "#FF5A6E", think: "#FFC94A", calm: "#3CD48A", happy: "#3CD48A" }[e];
-  return (
-    <g>
-      <circle r="22" fill={col} stroke={ink} strokeWidth="2" />
-      <ellipse cx="-7" cy="-9" rx="8" ry="5" fill="#FFFFFF" opacity="0.35" />
-      <g stroke={ink} strokeWidth="2.6" strokeLinecap="round" fill="none">
-        {e === "upset" && (<>
-          <path d="M-12 -9 L-4 -6 M12 -9 L4 -6" />
-          <circle cx="-7" cy="-1" r="2.2" fill={ink} stroke="none" /><circle cx="7" cy="-1" r="2.2" fill={ink} stroke="none" />
-          <path d="M-8 12 Q0 5 8 12" />
-        </>)}
-        {e === "pain" && (<>
-          <path d="M-12 -6 L-5 -2 L-12 2 M12 -6 L5 -2 L12 2" />
-          <path d="M-8 10 q2 -3 4 0 q2 3 4 0 q2 -3 4 0" />
-        </>)}
-        {e === "think" && (<>
-          <path d="M-12 -8 L-4 -10 M5 -10 L12 -6" />
-          <circle cx="-7" cy="-1" r="2.2" fill={ink} stroke="none" /><circle cx="7" cy="-1" r="2.2" fill={ink} stroke="none" />
-          <path d="M-6 11 L7 8" />
-        </>)}
-        {e === "calm" && (<>
-          <path d="M-11 -2 Q-7 2 -3 -2 M3 -2 Q7 2 11 -2" />
-          <path d="M-7 9 Q0 14 7 9" />
-        </>)}
-        {e === "happy" && (<>
-          <path d="M-11 -1 Q-7 -6 -3 -1 M3 -1 Q7 -6 11 -1" />
-          <path d="M-10 6 Q0 18 10 6 Z" fill="#FFFFFF" />
-        </>)}
-      </g>
-      {e === "think" && <text x="27" y="-12" fontSize="18" fontWeight="900" fill={ink}>?</text>}
-    </g>
-  );
-}
-
-function EmojiBubble({ x = 34, y = 0, e, s = 1, o = 1 }) {
-  if (s <= 0.01 || o <= 0.01) return null;
-  return (
-    <g transform={`translate(${x} ${y}) scale(${s})`} opacity={o}>
-      <path d="M-38 -62 h76 a10 10 0 0 1 10 10 v32 a10 10 0 0 1 -10 10 h-30 l-8 10 l-8 -10 h-30 a10 10 0 0 1 -10 -10 v-32 a10 10 0 0 1 10 -10 z" fill="#FFFFFF" stroke="#17141F" strokeWidth="2" />
-      <g transform="translate(-4 -36)"><MoodFace e={e} /></g>
-    </g>
-  );
-}
+/* 표정 말풍선: 픽셀 표정 (힘듦 X_X · 만족 '-' · 궁금 보라 점 3개, AI 안내 로봇과 같은 표정 규칙) */
+const EmojiBubble = PixBubble;
 const heroSway = (u) => { const shove = PUSH.reduce((s, [c, d]) => s + Math.exp(-Math.pow((u - c) / 0.18, 2)) * d, 0); return Math.sin(u * 2.4) * 4 + shove * 16; };
 
 function CrowdedCar({ u, pose }) {
@@ -539,7 +330,7 @@ function CrowdedCar({ u, pose }) {
   const pain = PUSH.some(([c]) => Math.abs(u - c) < 0.35);
   const items = [];
   SEATED.forEach((x, i) => items.push({ d: x + 0.42, el: (
-    <g key={"s" + i} transform={at(x, 0.42)}><g transform="scale(0.74)"><Person c={BODY[i % 6]} seat face={i % 2 ? 1 : -1} phone={i % 3 === 0} /></g></g>
+    <g key={"s" + i} transform={at(x, SEAT_Y)}><g transform="scale(0.74)"><Person c={BODY[i % 6]} seat face={i % 2 ? 1 : -1} phone={i % 3 === 0} /></g></g>
   ) }));
   CROWD.forEach(([x, y, ci, arm, face], i) => {
     const near = Math.hypot(x - HERO[0], y - HERO[1]) < 1.6;
@@ -551,7 +342,7 @@ function CrowdedCar({ u, pose }) {
       </g>
     ) });
   });
-  const pole = (x, y) => { const [a, b] = iso(x, y, 0), [c, d] = iso(x, y, H); return <line x1={a} y1={b} x2={c} y2={d} stroke="#8A82D0" strokeWidth="4" />; };
+  const pole = (x, y) => { const [a, b] = iso(x, y, 0), [c, d] = iso(x, y, H); return <g><line x1={a} y1={b} x2={c} y2={d} stroke="#5E569E" strokeWidth="8" /><line x1={a - 2} y1={b} x2={c - 2} y2={d} stroke="#A9A2EA" strokeWidth="3" /></g>; };
   items.push({ d: 3.4 + 2.9, el: <g key="pole1">{pole(3.4, 2.9)}</g> });
   items.push({ d: 10.0 + 2.6, el: <g key="pole2">{pole(10.0, 2.6)}</g> });
   const hsw = Math.sin(u * 2.4) * 4 + shove * 16;
@@ -566,16 +357,18 @@ function CrowdedCar({ u, pose }) {
 }
 
 /* ---------- 1. 훅 + 로고 (0–5초) ---------- */
+// 첫 화면은 서비스 색(네온 그린 = 편한 길, 핑크 = 빠른 길)으로: 배경·격자까지 짙은 초록 톤 (시안 11 B안)
+const HOOK = { bg: "#0C2A26", bg2: "#061412", grid: "#145244", line: "#1FA37A", sub: "#9FD9C6" };
 function Scene1({ u }) {
   const lines = [
-    { d: "M-40 180 H520 L700 360 H1320", c: C.cyan, a: 0.1 },
+    { d: "M-40 180 H520 L700 360 H1320", c: C.green, a: 0.1 },
     { d: "M-40 560 H360 L560 360 H1320", c: C.pink, a: 0.3 },
-    { d: "M240 -40 V760", c: C.violet, a: 0.5 },
-    { d: "M1040 -40 V760", c: C.blue, a: 0.7 },
+    { d: "M240 -40 V760", c: HOOK.line, a: 0.5 },
+    { d: "M1040 -40 V760", c: HOOK.line, a: 0.7 },
   ];
   return (
-    <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 40%, ${C.bg2}, ${C.bg} 70%)` }}>
-      <IsoGrid t={u} a={0.4} />
+    <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 40%, ${HOOK.bg}, ${HOOK.bg2} 70%)` }}>
+      <IsoGrid t={u} a={0.4} color={HOOK.grid} />
       <svg className="absolute inset-0" width="1280" height="720" aria-hidden="true">
         {lines.map((l, i) => (
           <path key={i} d={l.d} fill="none" stroke={l.c} strokeWidth="5" strokeLinecap="round" opacity="0.7" filter="url(#hz-glow)"
@@ -584,15 +377,15 @@ function Scene1({ u }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <p className="text-[64px] font-black leading-tight" style={{ color: C.fg, opacity: p(u, 0.3, 0.45),
-          transform: `scale(${u < 0.3 ? 2 : 2 - out(p(u, 0.3, 0.6))})`, textShadow: `0 0 24px ${C.blue}` }}>몇 분 더 쓰면,</p>
-        <p className="text-[64px] font-black leading-tight" style={{ ...gradText(C.cyan, C.pink), opacity: p(u, 1.1, 1.25),
+          transform: `scale(${u < 0.3 ? 2 : 2 - out(p(u, 0.3, 0.6))})`, textShadow: `0 0 24px ${C.green}` }}>몇 분 더 쓰면,</p>
+        <p className="text-[64px] font-black leading-tight" style={{ color: C.green, textShadow: `0 0 22px ${C.green}88`, opacity: p(u, 1.1, 1.25),
           transform: `scale(${u < 1.1 ? 2 : 2 - out(p(u, 1.1, 1.4))})` }}>얼마나 덜 붐빌까?</p>
         <div className="mt-10 flex items-center gap-5" style={rise(u, 2.4, 3.0, 30)}>
           <Mark t={u} start={2.4} size={110} />
           <div className="w-fit text-left">
             <p className="whitespace-nowrap text-[40px] font-black"><span style={{ color: C.pink }}>빨리 갈까,</span> <span style={{ color: C.green }}>편하게 갈까?</span></p>
             {/* 설명 글귀는 위 서비스명 잉크 폭('빨'의 받침 ㄹ 시작 ~ '?' 아래 점 끝)에 맞춰 자간을 넓힘 */}
-            <FitWidth className="whitespace-nowrap text-[19px]" style={{ color: C.sub, ...rise(u, 3.2, 3.7, 12) }}>혼잡도까지 비교하는 지하철 경로 추천 서비스</FitWidth>
+            <FitWidth className="whitespace-nowrap text-[19px]" style={{ color: HOOK.sub, ...rise(u, 3.2, 3.7, 12) }}>혼잡도까지 비교하는 지하철 경로 추천 서비스</FitWidth>
           </div>
         </div>
       </div>
@@ -652,13 +445,6 @@ function Scene2({ u }) {
           <g transform={`translate(${hx + heroSway(u)} ${hy})`}>
             <EmojiBubble x={40} y={-160} e={PUSH.some(([c]) => Math.abs(u - c) < 0.35) ? "pain" : "upset"} s={(u < 0.5 ? 0 : back(p(u, 0.5, 0.8))) * 1.5} />
           </g>
-          {/* 머리 주변 스트레스 표시 */}
-          <g transform={`translate(${hx} ${hy - 150})`} opacity={p(u, 1.0, 1.4)}>
-            {[[-34, -20, -1], [34, -24, 1], [0, -40, 0]].map(([x0, y0, d], i) => (
-              <path key={i} d={`M${x0 - 8} ${y0} l4 -6 l4 6 l4 -6 l4 6`} transform={`rotate(${d * 25} ${x0} ${y0}) translate(${Math.sin(u * 14 + i) * 1.5} 0)`}
-                fill="none" stroke={C.pink} strokeWidth="2.5" strokeLinecap="round" filter="url(#hz-glow)" />
-            ))}
-          </g>
         </g>
         <rect width="1280" height="720" fill="url(#hz-redvig)" />
       </svg>
@@ -671,7 +457,7 @@ function Scene2({ u }) {
         ⚠ 혼잡 경고 · 밀려드는 사람들
       </div>
       <div className="absolute" style={{ left: M, bottom: BOTTOM, width: span(6), wordBreak: "keep-all", ...rise(u, 1.6, 2.1, 20), opacity: p(u, 1.6, 2.1) * (1 - p(u, 4.4, 4.9)) }}>
-        <p className="text-[48px] font-black leading-tight" style={{ color: C.fg, textShadow: "0 2px 18px #0A0B1E" }}>퇴근길,<br /><span style={gradText(C.pink, C.red)}>숨 막히는</span> 지하철 혼잡도</p>
+        <p className="text-[48px] font-black leading-tight" style={{ color: C.fg, textShadow: "0 2px 18px #0A0B1E" }}>퇴근길,<br /><span style={{ ...gradText("#FF7AC6", "#FF4D6D"), textShadow: "none", filter: "drop-shadow(0 0 6px rgba(255,46,151,.9)) drop-shadow(0 0 16px rgba(255,46,151,.5))" }}>숨 막히는</span> 지하철 혼잡도</p>
       </div>
       <div style={{ opacity: 1 - p(u, 4.4, 4.9) }}><Gauge u={u} at={1.0} from={40} to={140} lv={5} warm /></div>
     </div>
@@ -703,7 +489,7 @@ function Scene3({ u }) {
       </svg>
       <div className="absolute inset-0" style={{ background: "linear-gradient(60deg, rgba(10,11,30,.85) 0%, rgba(10,11,30,0) 45%)", opacity: p(u, 1.0, 1.6) * (1 - p(u, 3.0, 3.4)) }} />
       <div className="absolute" style={{ left: M, bottom: BOTTOM, width: span(5), ...rise(u, 1.2, 1.7, 20), opacity: p(u, 1.2, 1.7) * (1 - p(u, 3.0, 3.4)) }}>
-        <p className="text-[46px] font-black leading-tight" style={{ color: C.fg }}>답답한 퇴근길,<br /><span style={gradText(C.cyan, C.blue)}>해결책은 없을까?</span></p>
+        <p className="text-[46px] font-black leading-tight" style={{ color: C.fg }}>답답한 퇴근길,<br /><span style={{ ...gradText(C.cyan, C.blue), filter: "drop-shadow(0.7px 0 0 #2BB0FF) drop-shadow(-0.7px 0 0 #2BB0FF)" }}>해결책은 없을까?</span></p>
       </div>
     </div>
   );
@@ -876,8 +662,14 @@ function Holo({ t }) {
           )}
           {t > T5 + 3.4 && (
             <div className="mb-3 mt-3 flex flex-1 flex-col rounded-xl px-3 py-3" style={{ background: "rgba(57,255,176,.1)", ...neon(C.green, 0.3), ...rise(t, T5 + 3.4, T5 + 3.7) }}>
-              <span className="inline-flex w-fit items-center gap-1 rounded-md px-2 py-[1px] text-[12px] font-bold" style={{ background: C.green, color: C.bg }}><Sparkles size={12} /> AI 한 줄 요약</span>
-              <p className="mt-2 min-h-[48px] text-[15px] leading-snug" style={{ color: th.fg }}>{aiTyped}</p>
+              {/* AI 안내 도우미: 우리 지하철 로봇이 추천 경로를 한 줄로 알려 줌 (찾는 동안은 보라 점, 다 쓰면 그린 '-' 표정) */}
+              <div className="flex items-center gap-3">
+                <GuideRobot face={aiTyped.length < ai.length ? "work" : "done"} className="w-[52px]" />
+                <div className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 text-[11px] font-extrabold tracking-[.05em]" style={{ color: C.cyan }}><span className="h-[6px] w-[6px]" style={{ background: C.pink }} />AI 안내 도우미</span>
+                  <p className="mt-1 min-h-[42px] text-[14px] leading-snug" style={{ color: th.fg }}>{aiTyped}</p>
+                </div>
+              </div>
               <div className="mt-auto flex flex-col gap-2 border-t pt-3 text-[13px]" style={{ borderColor: "rgba(57,255,176,.25)", opacity: p(t, T5 + 5.3, T5 + 5.8) }}>
                 {[["도착 예정", "18:47 (빠른 길 18:42)"], ["가장 붐비는 구간", "5단계 → 3단계"], ["4단계 이상 구간", "5곳 → 0곳"]].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-2"><span style={{ color: th.sub }}>{k}</span><b style={{ color: th.fg }}>{v}</b></div>
@@ -995,14 +787,14 @@ function Scene6({ u }) {
   const hx = 7.4;
   const bs = u < 0.6 ? 0 : back(p(u, 0.6, 0.95));
   items.push({ d: hx + 0.42, el: (
-    <g key="hero" transform={at(hx, 0.42)}>
+    <g key="hero" transform={at(hx, SEAT_Y)}>
       <g transform={`scale(${HERO_SCALE})`}><Hero pose="sit" mood="happy" look={0.4} glow={0.4} t={u} rim={C.green} /></g>
     </g>
   ) });
-  items.push({ d: 12.6 + 0.42, el: <g key="p1" transform={at(12.6, 0.42)}><g transform="scale(0.74)"><Person c="#7D8FC0" seat face={1} phone rim={C.green} rimA={0.6} /></g></g> });
+  items.push({ d: 12.6 + 0.42, el: <g key="p1" transform={at(12.6, SEAT_Y)}><g transform="scale(0.74)"><Person c="#7D8FC0" seat face={1} phone rim={C.green} rimA={0.6} /></g></g> });
   items.push({ d: 3.0 + 2.7, el: <g key="p2" transform={at(3.0, 2.7)}><g transform="scale(0.76)"><Person c="#8C7FC0" face={1} phone rim={C.green} rimA={0.6} /></g></g> });
-  items.push({ d: 4.2 + 0.42, el: <g key="p3" transform={at(4.2, 0.42)}><g transform="scale(0.74)"><Person c="#6E9BC8" seat face={1} rim={C.green} rimA={0.6} /></g></g> });
-  const [px, py] = iso(hx, 0.42);
+  items.push({ d: 4.2 + 0.42, el: <g key="p3" transform={at(4.2, SEAT_Y)}><g transform="scale(0.74)"><Person c="#6E9BC8" seat face={1} rim={C.green} rimA={0.6} /></g></g> });
+  const [px, py] = iso(hx, SEAT_Y);
   const k = 1.75 + u * 0.03;
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: "linear-gradient(160deg,#04241F,#061A26)" }}>
@@ -1010,7 +802,7 @@ function Scene6({ u }) {
         <g transform={cam(k, px, py - 90, 760, 360)}>
           <ellipse cx={px} cy={py} rx="420" ry="210" fill={C.green} opacity="0.08" />
           <IsoCar t={u} calm day items={items} />
-          <g transform={at(hx, 0.42)}><EmojiBubble y={-(190 - 28) * HERO_SCALE - 8} e={u < 3 ? "calm" : "happy"} s={bs * 1.2} /></g>
+          <g transform={at(hx, SEAT_Y)}><EmojiBubble y={-(190 - 28) * HERO_SCALE - 8} e={u < 3 ? "calm" : "happy"} s={bs * 1.2} /></g>
           {[0, 1, 2, 3, 4, 5].map((i) => {
             const y = py - 60 - ((u * 30 + i * 33) % 200);
             return <circle key={i} cx={px - 120 + i * 50} cy={y} r="2.5" fill={i % 2 ? C.green : C.cyan} opacity="0.7" filter="url(#hz-glow)" />;
@@ -1290,18 +1082,18 @@ function GameBreak({ ac, onDone }) {
     <div onClick={(e) => e.stopPropagation()} className={"z-50 flex flex-col items-center gap-3 p-3 " + (touch ? "fixed" : "fixed inset-0 md:absolute md:p-4")}
       style={{ background: touch ? "#060614" : "rgba(6,6,20,.94)", ...(touch ? (land
         ? { left: "50%", top: "50%", width: vpx.h, height: vpx.w, transform: "translate(-50%, -50%) rotate(-90deg)" }
-        : { left: 0, top: 0, width: vpx.w, height: vpx.h }) : null) }} role="dialog" aria-label="체험 게임: 혼잡한 열차를 피해서 목적지로 이동해 보자!">
+        : { left: 0, top: 0, width: vpx.w, height: vpx.h }) : null) }} role="dialog" aria-label="체험 게임 CROSSY METRO: 혼잡한 열차를 피해 이동해 보자!">
       <div className="flex w-full items-center justify-between gap-2" style={{ maxWidth: size.w || CW, containerType: "inline-size" }}>
-        {/* 제목: 컴퓨터는 한 줄, 휴대폰(세로 게임)은 "목적지" 앞에서 두 줄로 나눔 */}
-        <p className={"flex min-w-0 items-center gap-2 font-black" + (phone ? "" : " whitespace-nowrap")} style={{ color: C.fg, fontSize: phone ? 15 : "clamp(11px, 2.9cqw, 19px)", whiteSpace: phone ? undefined : "nowrap" }}>
-          <svg viewBox="0 0 48 48" aria-hidden="true" className="h-auto w-[30px] shrink-0 md:w-[38px]"><g stroke="#3A2400" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><circle cx="24" cy="20" r="16" fill="#FFD34D"/><path d="M11.5 11.5 L20.5 15 M36.5 11.5 L27.5 15" strokeWidth="3"/><ellipse cx="18" cy="20.5" rx="3.3" ry="4" fill="#3A2400"/><ellipse cx="30" cy="20.5" rx="3.3" ry="4" fill="#3A2400"/><circle cx="19.1" cy="18.8" r="1.25" fill="#fff" stroke="none"/><circle cx="31.1" cy="18.8" r="1.25" fill="#fff" stroke="none"/><ellipse cx="11.6" cy="26.4" rx="3.2" ry="1.9" fill="#FF8FB0" opacity=".75" stroke="none"/><ellipse cx="36.4" cy="26.4" rx="3.2" ry="1.9" fill="#FF8FB0" opacity=".75" stroke="none"/><path d="M18.6 35.06 C18.6 28.6 20.6 26.4 24 26.4 C27.4 26.4 29.4 28.6 29.4 35.06 A16 16 0 0 1 18.6 35.06 Z" fill="#FF9DB4" strokeWidth="2"/><path d="M2.4 3 l3.4 2.6 M1.2 10 l3.9 1.1 M42.6 13.4 l3.6 -1.2 M42.8 19.4 l3.6 1.1" stroke="#FF2E97" strokeWidth="2.2"/><circle cx="10.5" cy="39.5" r="7" fill="#FFD34D"/><circle cx="37.5" cy="39.5" r="7" fill="#FFD34D"/><path d="M8.1 40.6 V45.4 M10.5 40.2 V46.2 M12.9 40.6 V45.4 M35.1 40.6 V45.4 M37.5 40.2 V46.2 M39.9 40.6 V45.4" fill="none" strokeWidth="1.3"/></g></svg>
+        {/* 제목: 픽셀 글씨 CROSSY METRO + 한 줄 안내. 휴대폰(세로 게임)은 "이동해" 앞에서 두 줄로 나눔 */}
+        <p className="flex min-w-0 items-center gap-3 font-black" style={{ color: C.fg, fontSize: phone ? 14 : "clamp(11px, 2.6cqw, 18px)" }}>
+          <span className="shrink-0" style={{ fontFamily: '"Press Start 2P", monospace', fontWeight: 400, fontSize: phone ? 12 : "clamp(10px, 2.2cqw, 16px)", textShadow: "2px 2px 0 #1E2A5A" }}>CROSSY METRO</span>
           <span>
-            <span className="whitespace-nowrap" style={{ display: phone ? "block" : "inline" }}><span style={gradText(C.pink, C.cyan)}>혼잡한 열차</span>를 피해서</span>{phone ? null : " "}
-            <span className="whitespace-nowrap" style={{ display: phone ? "block" : "inline" }}><span style={gradText(C.green, C.cyan)}>목적지</span>로 이동해 보자!</span>
+            <span className="whitespace-nowrap"><span style={gradText(C.pink, C.cyan)}>혼잡한 열차</span>를 피해</span>{phone ? <br /> : " "}
+            <span className="whitespace-nowrap">이동해 보자!</span>
           </span>
         </p>
         <button type="button" onClick={() => onDone(null)} className="shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-[12px] font-bold md:px-4 md:text-[13px]"
-          style={{ background: C.bg2, color: C.fg, boxShadow: `0 0 0 1px ${C.line}` }}>건너뛰기 ⏭</button>
+          style={{ background: C.bg2, color: C.fg, boxShadow: `0 0 0 1px ${C.line}` }}>건너뛰기 ▸▸</button>
       </div>
       <div ref={box} className="flex min-h-0 w-full flex-1 items-center justify-center">
       <div className="relative" style={{ width: size.w, height: size.h, containerType: "size" }}>
@@ -1317,7 +1109,7 @@ function GameBreak({ ac, onDone }) {
               style={{ background: `linear-gradient(90deg, ${C.green}, ${C.cyan})`, color: C.bg, boxShadow: `0 0 20px ${C.cyan}66`, opacity: readyK }}>
               직접 피해 보세요 <ArrowRight size={18} />
             </button>
-            <p className={"text-[13px]" + (phone ? "" : " md:text-[18px]")} style={{ color: C.sub, opacity: readyK }}>{touch ? "화면을 터치해서 움직여요" : "방향키·WASD로 움직여요"}</p>
+            <p className={"text-[13px]" + (phone ? "" : " md:text-[18px]")} style={{ color: C.sub, opacity: readyK }}>{touch ? "탭하면 앞으로 · 좌우로 밀면 옆으로" : "↑ 앞으로 · ← → 옆으로"}</p>
           </div>
         )}
         {phase === "bridge" && (
@@ -1576,7 +1368,7 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
       {/* 소리: 일반 영상 도구 막대처럼 재생 막대 오른쪽 끝. 꺼져 있을 때는 눈에 띄게 색을 입힘 */}
       <button type="button" onClick={toggleSound} aria-label={sound ? "소리 끄기" : "소리 켜기"} title={sound ? "소리 끄기" : "소리 켜기"}
         className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
-        style={sound ? { background: C.bg2, color: C.fg, boxShadow: `0 0 0 1px ${C.line}` } : { background: `linear-gradient(90deg, ${C.blue}, ${C.cyan})`, color: C.bg, boxShadow: `0 0 14px ${C.cyan}88` }}>
+        style={sound ? { background: C.bg2, color: C.fg, boxShadow: `0 0 0 1px ${C.line}` } : { background: `linear-gradient(90deg, ${C.green}, ${C.cyan})`, color: C.bg, boxShadow: `0 0 14px ${C.green}88` }}>
         {sound ? <Volume2 size={16} /> : <VolumeX size={16} />}
       </button>
       {/* 공유: 누른 버튼 바로 왼쪽에 말풍선으로 결과 안내(2초). 장면을 가리지 않도록 재생 막대 줄 안에 띄움 */}
@@ -1617,7 +1409,7 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
                 className={"absolute right-3 top-3 z-40 grid h-10 w-10 place-items-center rounded-full text-[18px] font-bold transition-opacity duration-300 " + (uiOn ? "opacity-100" : "pointer-events-none opacity-0")}
                 style={{ background: "rgba(10,11,30,.75)", color: C.fg, boxShadow: `0 0 0 1px ${C.line}` }}>✕</button>
             )}
-            <div className="absolute left-0 top-0 h-[720px] w-[1280px] origin-top-left" style={{ transform: `scale(${scale})`, perspective: "1600px" }}>
+            <div className="reel-art absolute left-0 top-0 h-[720px] w-[1280px] origin-top-left" style={{ transform: `scale(${scale})`, perspective: "1600px" }}>
               {layers.map(({ s, style }) => {
                 const V = VIEWS[s.id];
                 return (
@@ -1650,7 +1442,7 @@ export default function ShowReel({ gameHref = FULL_GAME_URL, fitOffset = 120, ct
         <div className="mt-3 grid grid-cols-4 gap-2 lg:mt-0 lg:flex lg:flex-col lg:justify-between lg:gap-6">
           <div className="contents lg:grid lg:grid-cols-1 lg:gap-3">
             <button type="button" onClick={toggleSound} className={btn.replace("inline-flex ", "hidden lg:inline-flex ")}
-              style={sound ? plain : { background: `linear-gradient(90deg, ${C.blue}, ${C.cyan})`, color: C.bg }}>
+              style={sound ? plain : { background: `linear-gradient(90deg, ${C.green}, ${C.cyan})`, color: C.bg }}>
               {sound ? <><VolumeX size={15} /> 소리 끄기</> : <><Volume2 size={15} /> 소리 켜기</>}
             </button>
             <button type="button" onClick={togglePlay} className={btn.replace("inline-flex ", "hidden lg:inline-flex ")} style={plain}>

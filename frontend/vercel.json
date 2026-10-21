@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/reel", "destination": "/reel.html" },
     { "source": "/game", "destination": "/game/index.html" },
+    { "source": "/game/metro-man", "destination": "/game/metro-man/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
