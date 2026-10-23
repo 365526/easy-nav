@@ -13,7 +13,8 @@
 | API 설명 문서 | [backend/docs/API.md](backend/docs/API.md) |
 | DB 테이블 문서 | [backend/docs/DB_TABLES.md](backend/docs/DB_TABLES.md) |
 
-> API 서버는 무료 요금제라 15분 동안 요청이 없으면 잠듭니다. 처음 열 때 1분 정도 걸릴 수 있습니다.
+> API 서버는 무료 요금제라 15분 동안 요청이 없으면 잠듭니다. 처음 열 때 1분 정도 걸릴 수 있습니다.[cite: 2]
+> 수업일(목요일) 저녁(18:00~22:50)에는 GitHub Actions(서버 깨우기)가 10분마다 서버를 불러 깨워 둡니다.
 
 ## 해결하려는 문제
 
