@@ -29,9 +29,8 @@
 | 데이터 분석 페이지 (데이터 소개, 히트맵, 혼잡 순위) | 완료 |
 | 빠른 길 vs 편한 길 비교 (후보 경로 최대 3개, 시간 가중치 점수) | 완료 |
 | 출발 시각 비교 (앞뒤 1시간, 30분 간격) | 완료 |
-| AI 한 줄 요약 (추천 이유 설명) | 진행 예정 |
 | AI 안내 도우미 근거 자료 찾기 (빠른하차정보·교통약자이용정보) | API 완료 |
-| AI 안내 도우미 답변 (찾은 자료로만 답하는 RAG) | 진행 중 |
+| AI 안내 도우미 답변 (찾은 자료로만 답하는 RAG) | 완료 |
 
 혼잡도는 퍼센트 대신 5단계로 보여 줍니다.
 
@@ -53,12 +52,14 @@ flowchart LR
     B -->|경로 요청| R["최단경로이동정보 API<br/>서울교통공사"]
     P["공공데이터 파일<br/>혼잡도 CSV"] -->|정제 · 적재 스크립트| D
     G["빠른하차정보 · 교통약자이용정보 API<br/>서울교통공사"] -->|적재 스크립트| D
+    B -->|찾은 자료 + 질문| L["생성형 AI API"]
 ```
 
 1. 혼잡도 CSV를 정제해 DB에 미리 넣어 둡니다.
 2. 사용자가 출발역·도착역·시각을 넣으면 서버가 최단경로 API로 경로를 받습니다. 같은 조건의 응답은 DB에 저장해 다시 씁니다.
 3. 서버가 경로의 구간마다 그 시각의 혼잡도를 DB에서 찾아 평균과 최댓값을 계산하고 5단계로 바꿔 돌려줍니다.
 4. 붐비는 역을 피한 돌아가는 경로도 받아, 시간과 혼잡도에 가중치를 둔 점수로 후보를 비교합니다.
+5. 안내 도우미는 질문에 맞는 자료를 DB에서 먼저 찾고(Retrieval), 그 자료만 AI에게 넘겨 답을 만듭니다(Generation). 자료가 없으면 AI를 부르지 않고 못 찾았다고 답합니다.
 
 ## 사용 데이터와 출처
 
@@ -91,7 +92,7 @@ easy-nav/
 └── backend/           FastAPI 서버 (Render 배포)
     ├── main.py        API
     ├── route_logic.py 경로 계산 (후보 경로, 구간 혼잡도, 점수)
-    ├── guide.py       AI 안내 도우미 (근거 자료 찾기)
+    ├── guide.py       AI 안내 도우미 (근거 자료 찾기, 찾은 자료로 답하기)
     ├── scripts/       데이터 정제·적재·확인 스크립트, 테이블 정의(schema.sql)
     └── docs/          API 설명 문서, DB 테이블 문서
 ```
@@ -104,7 +105,7 @@ cd frontend
 npm install
 npm run dev
 
-# 서버 (backend/.env에 PUBLIC_DATA_API_KEY, ROUTE_API_URL, DATABASE_URL 필요)
+# 서버 (backend/.env에 PUBLIC_DATA_API_KEY, ROUTE_API_URL, DATABASE_URL, LLM_API_KEY 필요)
 cd backend
 python -m venv .venv
 .venv\Scripts\activate

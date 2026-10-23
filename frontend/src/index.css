@@ -110,6 +110,20 @@ input.tradeoff:focus-visible {
   shape-rendering: crispEdges;
 }
 
+.guide-tail-line {
+  fill: #22e5ff;
+}
+/* 못 찾음·오류: 테두리와 빛, 꼬리를 핑크로 */
+.guide-bubble-miss {
+  filter: drop-shadow(0 0 6px rgba(255, 46, 151, 0.55));
+}
+.guide-bubble-miss .guide-bubble-line {
+  background: #ff2e97;
+}
+.guide-bubble-miss .guide-tail-line {
+  fill: #ff2e97;
+}
+
 /* 찾는 중: 점 3개가 0 → 1 → 2 → 3개로 하나씩 켜짐 (한 박자 0.5초, 2초마다 반복) */
 .blink {
   animation: blink0 2s steps(1, end) infinite;

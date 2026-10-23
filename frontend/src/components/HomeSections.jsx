@@ -43,7 +43,7 @@ const STEPS = [
 export function HowItWorks() {
   return (
     <section>
-      <SectionTitle eyebrow="작동 방식" title="계산은 데이터로,/설명은 AI로" />
+      <SectionTitle eyebrow="작동 방식" title="계산은 데이터로,/안내는 AI로" />
       <ol className="grid gap-4 md:grid-cols-3">
         {STEPS.map((s, i) => (
           <li key={s.title} className={card}>
@@ -54,8 +54,8 @@ export function HowItWorks() {
         ))}
       </ol>
       <p className={`${card} mt-4 text-[15px] leading-relaxed text-[#A9A6D6]`}>
-        <strong className="text-[#39FFB0]">AI 한 줄 요약</strong>은 이미 계산된 결과만 보고 추천 이유를 문장으로 바꿉니다.
-        숫자를 새로 만들지 않기 때문에, 화면에 보이는 수치는 모두 공공데이터에서 나온 값입니다.
+        <strong className="text-[#39FFB0]">AI 안내 도우미</strong>는 빠른하차정보·교통약자이용정보에서 찾은 자료만 근거로 답하고,
+        자료에 없는 내용은 지어내지 않고 못 찾았다고 알립니다. 경로의 시간과 혼잡도는 모두 공공데이터로 계산한 값입니다.
       </p>
     </section>
   );
@@ -72,6 +72,7 @@ export function SourcesLimits() {
         <ul className="mt-3 list-disc pl-5 text-[15px] leading-relaxed text-[#A9A6D6]">
           <li>서울교통공사 지하철혼잡도정보 (1~8호선, 30분 단위)</li>
           <li>서울교통공사 최단경로이동정보 Open API</li>
+          <li>서울교통공사 빠른하차정보·교통약자이용정보 Open API (AI 안내 도우미 근거)</li>
           <li>역 정보, 역간 소요시간, 환승 소요시간 자료</li>
         </ul>
       </div>
@@ -81,6 +82,7 @@ export function SourcesLimits() {
           <li>분기 평균 통계로 계산한 예측이라 오늘의 실제 혼잡과 다를 수 있습니다.</li>
           <li>혼잡도 자료가 있는 1~8호선 구간만 계산합니다.</li>
           <li>사고·지연처럼 갑자기 생기는 일은 아직 반영하지 않습니다.</li>
+          <li>엘리베이터 가동 여부는 수시로 바뀌어 안내 도우미 답에 넣지 않습니다.</li>
         </ul>
       </div>
       </div>
