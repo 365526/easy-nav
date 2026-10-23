@@ -30,7 +30,8 @@
 | 빠른 길 vs 편한 길 비교 (후보 경로 최대 3개, 시간 가중치 점수) | 완료 |
 | 출발 시각 비교 (앞뒤 1시간, 30분 간격) | 완료 |
 | AI 한 줄 요약 (추천 이유 설명) | 진행 예정 |
-| 역·경로 안내 도우미 (RAG) | 진행 예정 |
+| AI 안내 도우미 근거 자료 찾기 (빠른하차정보·교통약자이용정보) | API 완료 |
+| AI 안내 도우미 답변 (찾은 자료로만 답하는 RAG) | 진행 중 |
 
 혼잡도는 퍼센트 대신 5단계로 보여 줍니다.
 
@@ -51,6 +52,7 @@ flowchart LR
     B -->|SQL| D[("DB<br/>PostgreSQL · Supabase")]
     B -->|경로 요청| R["최단경로이동정보 API<br/>서울교통공사"]
     P["공공데이터 파일<br/>혼잡도 CSV"] -->|정제 · 적재 스크립트| D
+    G["빠른하차정보 · 교통약자이용정보 API<br/>서울교통공사"] -->|적재 스크립트| D
 ```
 
 1. 혼잡도 CSV를 정제해 DB에 미리 넣어 둡니다.
@@ -64,6 +66,8 @@ flowchart LR
 |---|---|---|---|---|
 | 지하철혼잡도정보 | 서울교통공사 | CSV | 2026-06-30 | https://www.data.go.kr/data/15071311/fileData.do |
 | 최단경로이동정보 | 서울교통공사 | Open API | 호출 시점 | https://www.data.go.kr/data/15143842/openapi.do |
+| 빠른하차정보 | 서울교통공사 | Open API | 적재 시점 | https://www.data.go.kr/data/15143840/openapi.do |
+| 교통약자이용정보 (엘리베이터) | 서울교통공사 | Open API | 적재 시점 | https://www.data.go.kr/data/15143843/openapi.do |
 
 혼잡도는 정원 대비 승차 인원(%)으로, 승객 수와 좌석 수가 같을 때가 34%입니다. 실시간 값이 아닌 분기 평균 통계입니다.
 
@@ -87,6 +91,7 @@ easy-nav/
 └── backend/           FastAPI 서버 (Render 배포)
     ├── main.py        API
     ├── route_logic.py 경로 계산 (후보 경로, 구간 혼잡도, 점수)
+    ├── guide.py       AI 안내 도우미 (근거 자료 찾기)
     ├── scripts/       데이터 정제·적재·확인 스크립트, 테이블 정의(schema.sql)
     └── docs/          API 설명 문서, DB 테이블 문서
 ```

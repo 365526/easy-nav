@@ -41,3 +41,18 @@ create table if not exists route_cache (
 alter table stations         enable row level security;
 alter table congestion_stats enable row level security;
 alter table route_cache      enable row level security;
+
+-- 4) AI 안내 도우미의 근거 자료 (워크북 8): 공공데이터 API 한 줄마다 사람이 읽는 문장(content)과 원본(raw)을 함께 저장합니다.
+--    source는 자료 이름입니다. 답에 "근거: 서울교통공사 빠른하차정보"처럼 그대로 보여 줍니다.
+create table if not exists guide_docs (
+  id         bigint generated always as identity primary key,
+  source     text        not null check (source in ('빠른하차정보', '교통약자이용정보')),
+  line       text        not null,
+  station    text        not null,
+  content    text        not null,
+  raw        jsonb       not null,
+  base_date  date,
+  loaded_at  timestamptz not null default now()
+);
+create index if not exists guide_docs_by_station on guide_docs (station);
+alter table guide_docs enable row level security;
