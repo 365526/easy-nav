@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 
-from guide import search as guide_search
+from guide import ask as guide_ask, search as guide_search
 from route_logic import MAX_EXTRA_MINUTES, avoid_candidates, describe_route, fetch_route, level_info, no_data_entry, rank_routes
 
 load_dotenv()
@@ -17,7 +17,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 app = FastAPI(
     title="easy-nav API",
     description="빨리 갈까, 편하게 갈까? · 지하철 경로의 소요 시간과 혼잡도를 함께 계산합니다.",
-    version="0.4.0",
+    version="0.5.0",
 )
 
 # 화면(Vercel)과 내 컴퓨터의 개발용 화면에서 이 서버를 부를 수 있게 허용합니다.
@@ -209,3 +209,12 @@ def guide_docs(question: str = Query(..., min_length=1, max_length=100, descript
     안내 도우미가 답할 때 근거로 쓰는 자료이며, 자료를 찾지 못하면 docs가 빈 목록입니다."""
     with db() as conn:
         return guide_search(conn, question, station)
+
+
+@app.get("/guide/ask", tags=["안내 도우미"], summary="안내 도우미에게 묻기 (찾은 자료로만 답함)")
+def ask_guide(question: str = Query(..., min_length=1, max_length=100, description="예: 강남역 엘리베이터 위치"),
+              station: str = Query("", description="질문에 역 이름이 없을 때 쓸 역. 예: 경로 찾기의 도착역")):
+    """/guide/search로 찾은 자료만 AI에게 넘겨 짧게 답합니다. 자료가 없거나 자료로 답할 수 없으면 found: false입니다.
+    sources는 답의 근거가 된 자료 이름과 기준일입니다. AI를 쓸 수 없으면 503 오류입니다."""
+    with db() as conn:
+        return guide_ask(conn, question, station)

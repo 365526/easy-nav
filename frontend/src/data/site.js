@@ -27,8 +27,8 @@ export const ROADMAP = [
   { status: "done", title: "혼잡도 정리와 5단계 계산" },
   { status: "done", title: "혼잡도 분석 페이지" },
   { status: "done", title: "경로 추천 서버와 경로 찾기 화면" },
-  { status: "now", title: "AI 한 줄 요약" },
-  { status: "next", title: "지연·무정차 알림, 서비스 도우미" },
+  { status: "done", title: "AI 안내 도우미 (공공데이터 근거 답변)" },
+  { status: "next", title: "지연·무정차 알림" },
 ];
 
 // 7. 의견 받는 주소: 구글 설문 링크 등을 따옴표 안에 붙여 넣습니다. 비워 두면 버튼 대신 안내 문구가 나옵니다.

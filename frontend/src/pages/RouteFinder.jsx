@@ -166,7 +166,7 @@ export default function RouteFinder() {
         </section>
       )}
 
-      <AIGuide />
+      <AIGuide station={asked.to} />
     </div>
   );
 }
