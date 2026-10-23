@@ -1,5 +1,6 @@
 import { useState } from "react";
 import LevelBadge, { LEVELS, People } from "../LevelBadge.jsx";
+import RoutePathMap from "./RoutePathMap.jsx";
 import { addMinutes, lineColor, objectJosa, rerank, toLevel } from "./routeUtils.js";
 
 const pct = (v) => `${Number(v).toFixed(1)}%`;
@@ -274,6 +275,7 @@ export default function RouteResult({ data, timeWeight }) {
         </h2>
         {selected.average && <People n={selected.average.level} size={14} color={LEVELS[selected.average.level - 1].color} />}
       </div>
+      <RoutePathMap candidates={ranked} selected={selected} />
       <div className="grid gap-4 md:grid-cols-2">
         <Departures c={selected} />
         <Segments c={selected} />
