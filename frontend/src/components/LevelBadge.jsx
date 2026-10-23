@@ -7,6 +7,9 @@ export const LEVELS = [
   { lv: 5, name: "매우 혼잡", color: "#9A2E08", range: "121% 이상", feel: "움직이기도 어려워요" },
 ];
 
+// 어두운 바탕에서 선·빛으로 쓸 단계 색. 5단계는 그대로 쓰면 잘 안 보여서 조금 밝힌 색을 씁니다.
+export const levelEdge = (lv) => (lv === 5 ? "#D2502A" : LEVELS[lv - 1].color);
+
 // 사람 5명 그림: 채워진 사람 수가 단계입니다.
 export function People({ n, size = 14, color = "currentColor" }) {
   return (

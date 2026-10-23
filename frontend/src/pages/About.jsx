@@ -1,4 +1,4 @@
-import LevelBadge, { LEVELS, People } from "../components/LevelBadge.jsx";
+import LevelBadge, { LEVELS, People, levelEdge } from "../components/LevelBadge.jsx";
 import Phrases from "../components/Phrases.jsx";
 
 const STEPS = [
@@ -34,7 +34,14 @@ export default function About() {
         <p className="mt-2 text-[15px] text-[#A9A6D6]">혼잡도 = 탑승 인원 ÷ 정원 × 100. 정원만큼 탔을 때가 100%입니다.</p>
         <ul className="mt-5 flex flex-col gap-3">
           {LEVELS.map((l) => (
-            <li key={l.lv} className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-[#2C2366] bg-[#120E2E] px-5 py-4">
+            <li
+              key={l.lv}
+              className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border bg-[#120E2E] px-5 py-4"
+              style={{
+                borderColor: `${levelEdge(l.lv)}99`, // 단계 색 테두리(60%)
+                boxShadow: `0 0 12px ${levelEdge(l.lv)}33, inset 0 0 14px ${levelEdge(l.lv)}14`, // 은은한 네온 빛
+              }}
+            >
               <span className="w-[130px]"><LevelBadge lv={l.lv} /></span>
               <People n={l.lv} size={16} />
               <span className="min-w-[200px] flex-1 text-[16px] font-bold">{l.feel}</span>
