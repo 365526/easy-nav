@@ -1,0 +1,23 @@
+# 서버 깨우기: Render 무료 서버는 15분 동안 요청이 없으면 잠듭니다.
+# 수업일 낮에는 10분마다 서버와 DB를 한 번씩 불러 깨워 둡니다.
+name: 서버 깨우기
+
+on:
+  schedule:
+    # 시각은 UTC(한국 시간 - 9시간)로 적습니다.
+    # 목요일 09:00~13:50 UTC = 목요일 18:00~22:50 한국 시간, 10분마다
+    - cron: "*/10 9-13 * * 4"
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: API 서버 부르기
+        # 잠들어 있으면 깨어나는 데 1분 정도 걸려서, 15초 간격으로 5번까지 다시 시도합니다.
+        run: curl -fsS --retry 5 --retry-delay 15 --retry-all-errors --max-time 90 "https://easy-nav-api.onrender.com/"
+
+      - name: DB까지 부르기
+        # 역 검색은 DB(Supabase)를 읽으므로, DB도 오래 쉬지 않게 됩니다.
+        run: curl -fsS --max-time 60 -G "https://easy-nav-api.onrender.com/stations" --data-urlencode "keyword=사당"
