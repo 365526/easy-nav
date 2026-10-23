@@ -1,4 +1,4 @@
-"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API (워크북 4~6, 7-1)"""
+"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API, 안내 도우미 (워크북 4~6, 7-1, 8)"""
 import os
 from datetime import datetime
 
@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 
+from guide import search as guide_search
 from route_logic import MAX_EXTRA_MINUTES, avoid_candidates, describe_route, fetch_route, level_info, no_data_entry, rank_routes
 
 load_dotenv()
@@ -16,7 +17,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 app = FastAPI(
     title="easy-nav API",
     description="빨리 갈까, 편하게 갈까? · 지하철 경로의 소요 시간과 혼잡도를 함께 계산합니다.",
-    version="0.3.1",
+    version="0.4.0",
 )
 
 # 화면(Vercel)과 내 컴퓨터의 개발용 화면에서 이 서버를 부를 수 있게 허용합니다.
@@ -199,3 +200,12 @@ def heatmap(line: str = Query("2호선", description="예: 2호선"), direction:
     return {"line": line, "direction": direction, "day_type": day_type,
             "time_slots": [name for _, name in slots],
             "stations": [{"station_no": no, "name": name, "values": values} for (no, name), values in table.items()]}
+
+
+@app.get("/guide/search", tags=["안내 도우미"], summary="질문에 맞는 근거 자료 찾기")
+def guide_docs(question: str = Query(..., min_length=1, max_length=100, description="예: 강남역 엘리베이터 위치"),
+               station: str = Query("", description="질문에 역 이름이 없을 때 쓸 역. 예: 경로 찾기의 도착역")):
+    """질문에서 역 이름과 궁금한 것(엘리베이터, 내리는 칸)을 골라 빠른하차정보·교통약자이용정보에서 그 역의 자료를 찾습니다.
+    안내 도우미가 답할 때 근거로 쓰는 자료이며, 자료를 찾지 못하면 docs가 빈 목록입니다."""
+    with db() as conn:
+        return guide_search(conn, question, station)

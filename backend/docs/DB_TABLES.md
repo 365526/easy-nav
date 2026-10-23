@@ -2,7 +2,8 @@
 
 - DB: PostgreSQL (Supabase)
 - 자료: 서울교통공사_지하철혼잡도정보 (2026-06-30 기준, 공공데이터포털)
-- 적재: `backend/scripts/load_db.py` (테이블 정의는 `backend/scripts/schema.sql`)
+- 자료: 서울교통공사_빠른하차정보, 서울교통공사_교통약자이용정보(엘리베이터) Open API (AI 안내 도우미의 근거 자료)
+- 적재: `backend/scripts/load_db.py`(혼잡도), `backend/scripts/load_guide.py`(안내 도우미 자료) · 테이블 정의는 `backend/scripts/schema.sql`
 
 ## 테이블 관계
 
@@ -35,9 +36,19 @@ erDiagram
         jsonb response "최단경로 API 응답"
         timestamptz created_at "저장 시각"
     }
+    guide_docs {
+        bigint id PK
+        text source "빠른하차정보, 교통약자이용정보"
+        text line "호선"
+        text station "역 이름"
+        text content "사람이 읽는 문장"
+        jsonb raw "API 응답 한 줄 원문"
+        date base_date "자료 기준일"
+        timestamptz loaded_at "적재 시각"
+    }
 ```
 
-역 하나(stations)에 혼잡도 여러 줄(congestion_stats)이 붙는 1 : N 관계입니다. route_cache는 외부 API 응답을 저장하는 표라 다른 표와 연결하지 않습니다.
+역 하나(stations)에 혼잡도 여러 줄(congestion_stats)이 붙는 1 : N 관계입니다. route_cache는 외부 API 응답을 저장하는 표, guide_docs는 안내 도우미의 근거 자료 표라 다른 표와 연결하지 않습니다.
 
 ## stations · 역 (282줄)
 
@@ -80,6 +91,23 @@ erDiagram
 
 - 같은 출발역·도착역·출발 일시·검색 조건·피한 역은 한 줄만 저장합니다. 같은 조건으로 다시 요청하면 API를 부르지 않고 저장된 응답을 씁니다. (하루 호출 한도 10,000건 대비)
 
+## guide_docs · AI 안내 도우미 근거 자료
+
+| 컬럼 | 형식 | 키 | 설명 |
+|---|---|---|---|
+| id | bigint | 기본키 | 자동 번호 |
+| source | text | | 자료 이름: 빠른하차정보, 교통약자이용정보 |
+| line | text | | 호선 |
+| station | text | | 역 이름 (API의 stnNm) |
+| content | text | | API 한 줄을 사람이 읽는 문장으로 바꾼 것. AI에게 이 문장을 근거로 넘깁니다 |
+| raw | jsonb | | API 응답 한 줄 원문 |
+| base_date | date | | 자료 기준일 (API의 crtrYmd) |
+| loaded_at | timestamptz | | 적재한 시각 |
+
+- `scripts/load_guide.py`가 두 API의 모든 쪽을 받아 표를 비우고 다시 채웁니다. 없어진 엘리베이터(oprtngSitu = D)는 넣지 않습니다.
+- 역 이름으로 찾는 질의가 많아 station에 색인을 둡니다.
+- 엘리베이터 가동 상태는 5분마다 바뀌는 값이라 문장에 넣지 않습니다.
+
 ## 혼잡도 5단계 기준
 
 | 단계 | 이름 | 혼잡도 |
@@ -92,5 +120,5 @@ erDiagram
 
 ## 보안
 
-- 세 표 모두 Row Level Security를 켜서 Supabase 공개 주소(anon 키)로는 읽고 쓸 수 없습니다. 서버는 `DATABASE_URL`로 직접 접속합니다.
+- 네 표 모두 Row Level Security를 켜서 Supabase 공개 주소(anon 키)로는 읽고 쓸 수 없습니다. 서버는 `DATABASE_URL`로 직접 접속합니다.
 - 접속 주소와 비밀번호는 `backend/.env`와 Render 환경 변수에만 둡니다.
