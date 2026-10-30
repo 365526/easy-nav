@@ -51,7 +51,7 @@ function Stop({ stop, next }) {
         {stop.tip ? (
           <p className="mt-1.5 text-[15px] font-bold leading-relaxed">{stop.tip}</p>
         ) : stop.facts.length > 0 ? (
-          <p className="mt-1.5 text-[14px] leading-relaxed text-[#A9A6D6]">자료 원문으로 안내해요.</p>
+          <p className="mt-1.5 text-[14px] leading-relaxed text-[#A9A6D6]">AI 안내가 자료와 맞지 않아, 공공데이터 원문을 그대로 보여 드려요.</p>
         ) : (
           <p className="mt-1.5 text-[14px] leading-relaxed text-[#6E6A9E]">이 역은 서울교통공사 자료(1~8호선)에 안내가 없어요.</p>
         )}
@@ -95,7 +95,7 @@ export default function RouteGuide({ route }) {
     const started = Date.now();
     let done;
     try {
-      const legs = route.legs.map(({ line, from, to, direction }) => ({ line, from, to, direction: direction || "" }));
+      const legs = route.legs.map(({ line, from, to, direction, prev, next }) => ({ line, from, to, direction: direction || "", prev: prev || "", next: next || "" }));
       const res = await fetch(`${API_URL}/guide/route`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

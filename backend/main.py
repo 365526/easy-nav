@@ -229,6 +229,8 @@ class RouteLeg(BaseModel):
     start: str = Field(..., alias="from", max_length=30, description="이 노선을 타는 역")
     to: str = Field(..., max_length=30, description="이 노선에서 내리는 역")
     direction: str = Field("", max_length=10, description="상행·하행·내선·외선")
+    prev: str = Field("", max_length=30, description="내리는 역 바로 앞 역 (타고 온 쪽)")
+    next: str = Field("", max_length=30, description="타는 역 바로 다음 역 (가는 쪽)")
 
 
 class RouteGuideRequest(BaseModel):
