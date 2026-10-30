@@ -24,6 +24,19 @@ function Summary({ ranked, fastest, calmest }) {
   if (fastest.key !== calmest.key) {
     const extra = calmest.total_minutes - fastest.total_minutes;
     const down = fastest.average.level - calmest.average.level;
+    // 시간도 단계도 같으면 "+0분 · 단계 같음" 대신 문장으로 알립니다(9-1 점검: 노원 → 이수).
+    if (Math.round(extra) === 0 && down === 0) {
+      return (
+        <section className={box}>
+          <p className="text-[15px] font-bold text-[#A9A6D6]">비교 결과</p>
+          <p className="mt-2 text-[20px] font-black leading-snug md:text-[24px]">
+            같은 시간에 조금 덜 붐비는 길이 있습니다.
+            <br />
+            단계는 같고, 평균 혼잡도가 {pct(fastest.average.congestion)} → {pct(calmest.average.congestion)}로 낮습니다.
+          </p>
+        </section>
+      );
+    }
     return (
       <section className={box}>
         <p className="text-[15px] font-bold text-[#A9A6D6]">편한 길을 고르면</p>

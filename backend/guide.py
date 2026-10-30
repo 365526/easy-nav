@@ -113,7 +113,7 @@ def model_order(name):
     return score
 
 
-def generate_json(rules, prompt):
+def generate_json(rules, prompt, temperature=0.2):
     """AI에게 규칙(rules)과 내용(prompt)을 보내 JSON 답을 받습니다.
     1순위: 기억해 둔 모델 → 2순위: .env의 LLM_MODEL → 그래도 안 되면 쓸 수 있는 모델 목록을 받아 차례로 시도합니다."""
     global WORKING_MODEL
@@ -123,7 +123,7 @@ def generate_json(rules, prompt):
     data = json.dumps({
         "systemInstruction": {"parts": [{"text": rules}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048, "responseMimeType": "application/json"},
+        "generationConfig": {"temperature": temperature, "maxOutputTokens": 2048, "responseMimeType": "application/json"},
     }).encode("utf-8")
     opener = make_opener()
 
@@ -205,20 +205,27 @@ def ask(conn, question, station=""):
     return {"found": True, "answer": reply["answer"], "stations": found["stations"], "sources": source_list(found["docs"])}
 
 
-# ───────── 워크북 9: 경로 길잡이 (경로 전체를 한 번에) ─────────
+# ───────── 워크북 9·9-2: 경로 길잡이 (경로 전체를 한 번에) ─────────
 
 MODES = {"fast": "빨리 갈아타기", "easy": "휠체어·유모차"}
 STOP_LIMIT = 8  # 역 하나에 넘길 자료는 많아야 8줄
 NUMBER = re.compile(r"\d+(?:-\d+)?")  # 숫자 덩어리. 예: 3-2(칸-문), 4(번 출구), 2(호선)
+CAR = re.compile(r"\d+-\d+")          # 칸-문 번호. 예: 3-2
+# 2호선: 경로 API는 내선·외선, 빠른하차정보는 상행·하행으로 적습니다(9-1 점검: 외선 열차 = 상행 줄).
+DIRECTION_LABEL = {"외선": "상행", "내선": "하행"}
+# 경로 API와 근거 자료의 역 이름이 다른 곳 (9-1 점검: 4호선 이수 = 자료의 총신대입구)
+STATION_ALIAS = {"이수": ["총신대입구"], "총신대입구": ["이수"]}
 
-ROUTE_RULES = """너는 서울 지하철 길잡이다. 경로의 역마다 번호와 [자료]가 주어진다.
+ROUTE_RULES = """너는 서울 지하철 길잡이다. 경로의 역마다 번호, [열차], [자료]가 주어진다.
 - 각 역의 tip은 그 번호의 자료에 적힌 내용만 근거로 쓴다. 자료에 없는 칸 번호, 출입구 번호, 층, 위치는 절대 지어내지 않는다.
 - 자료가 '(자료 없음)'인 역은 tip을 빈 글자로 둔다.
-- 칸-문 번호(예: 3-2)는 자료에 적힌 그대로 옮긴다. 방면이 여럿이면 [열차]의 방향과 같은 줄을 고른다.
-- 빨리 갈아타기: 출발역은 다음 역에서 빨리 내리기 좋은 칸에 타라고 하고, 환승·도착역은 내릴 때 가까운 칸과 무엇(계단, 에스컬레이터, 엘리베이터)이 가까운지 알려 준다.
-- 휠체어·유모차: 엘리베이터와 가까운 칸, 엘리베이터 위치와 출입구를 알려 준다.
+- 자료의 'OO 방면'은 열차가 가는 쪽이다. [열차]에 적힌 '가는 쪽' 역 방면의 칸만 쓰고, '온 쪽' 역 방면은 반대 방향이니 쓰지 않는다. 방면은 하나만 쓴다.
+- 칸-문 번호(예: 3-2)는 자료에 적힌 그대로 옮긴다.
+- 빨리 갈아타기: 출발역 tip은 [다음에 내릴 역]에서 빨리 내리려면 몇 번 칸에 타라고 칸-문 번호를 꼭 넣어 쓴다. 환승·도착역 tip은 내릴 때 가까운 칸과 무엇(계단, 에스컬레이터, 엘리베이터)이 가까운지 쓴다.
+- 휠체어·유모차: 출발역은 승강장으로 내려가는 엘리베이터와 탈 칸, 환승역은 내릴 칸과 갈아탈 노선으로 가는 엘리베이터, 도착역은 내릴 칸과 나가는 엘리베이터·출입구를 쓴다.
+- 출발역과 환승역에서는 출구로 나가라고 하지 않는다. 출구 안내는 도착역에서만 한다.
 - 자료에 '환승'이라는 말이 없으면 환승 통로와 가깝다고 말하지 않는다.
-- tip은 한국어 '~요' 체 한 문장으로 60자 안쪽. summary는 경로 전체를 한 문장으로 요약한다.
+- tip은 한국어 '~요' 체 한 문장으로 60자 안쪽. summary도 '~요' 체 한 문장으로 경로 전체를 요약한다.
 - {"summary": "요약", "tips": [{"no": 번호, "tip": "안내"}]} 모양의 JSON으로만 답한다."""
 
 
@@ -226,6 +233,17 @@ def same_line(a, b):
     """'2호선'과 '02호선'처럼 표기가 조금 달라도 같은 노선으로 봅니다."""
     norm = lambda s: re.sub(r"^0+", "", (s or "").replace(" ", ""))
     return norm(a) == norm(b)
+
+
+def same_station(a, b):
+    """역 이름이 같은지: '신도림'과 '신도림역', '총신대입구(이수)'와 '이수'처럼 표기가 달라도 같은 역으로 봅니다."""
+    return bool(name_keys(a or "") & name_keys(b or ""))
+
+
+def stop_names(station, names):
+    """경로의 역 이름 → 근거 자료(guide_docs)에서 그 역을 부르는 이름 목록. 다른 이름(STATION_ALIAS)도 함께 찾습니다."""
+    wanted = [station] + STATION_ALIAS.get(re.sub(r"역$", "", station), [])
+    return [n for n in names if any(same_station(n, w) for w in wanted)]
 
 
 def route_stops(legs):
@@ -238,13 +256,26 @@ def route_stops(legs):
     return stops
 
 
+def right_way(r, leg):
+    """빠른하차정보 한 줄이 타고 온 열차 방향과 맞는지.
+    1) 방향 표기가 같으면(2호선은 외선=상행, 내선=하행으로 바꿔 비교) 맞음
+    2) 표기를 비교할 수 없으면, 방면이 '앞 역'(타고 온 쪽)이 아니면 맞음 — 앞 역 방면은 반대로 가는 열차입니다."""
+    raw = r["raw"] or {}
+    way, want = raw.get("upbdnbSe"), leg.get("direction") or ""
+    if way and want and way in (want, DIRECTION_LABEL.get(want)):
+        return True
+    toward, prev = raw.get("drtnInfo"), leg.get("prev")
+    if toward and prev:
+        return not same_station(toward, prev)
+    return False
+
+
 def stop_docs(rows, arrive, depart, mode):
     """역 하나의 자료(rows) 중 이 경로에 맞는 줄만 고릅니다.
-    빠른하차정보: 타고 온 노선, 그중 방향(상행·하행·내선·외선)이 같은 줄. 방향 표기가 달라 없으면 노선만 맞춥니다.
+    빠른하차정보: 타고 온 노선, 그중 방향이 맞는 줄(right_way). 하나도 없으면 노선만 맞춥니다.
     교통약자이용정보(엘리베이터): 타고 온 노선과 갈아탈 노선. 휠체어·유모차 안내에서만 씁니다."""
     exits = [r for r in rows if r["source"] == "빠른하차정보" and arrive and same_line(r["line"], arrive["line"])]
-    same_way = [r for r in exits if (r["raw"] or {}).get("upbdnbSe") == arrive.get("direction")] if arrive else []
-    exits = same_way or exits
+    exits = [r for r in exits if right_way(r, arrive)] or exits
     if mode == "fast":
         return exits[:STOP_LIMIT]
     lifts = [r for r in rows if r["source"] == "교통약자이용정보"
@@ -263,19 +294,25 @@ def guide_route(conn, legs, mode="fast"):
     names = [r["station"] for r in conn.execute("select distinct station from guide_docs").fetchall()]
     stops = route_stops(legs)
     for stop in stops:
-        matched = find_stations(stop["station"], names)
+        matched = stop_names(stop["station"], names)
         rows = conn.execute(
-            "select source, line, station, content, raw, base_date from guide_docs where station = %s order by id",
-            (matched[0],)).fetchall() if matched else []
+            "select source, line, station, content, raw, base_date from guide_docs where station = any(%s) order by id",
+            (matched,)).fetchall() if matched else []
         stop["docs"] = stop_docs(rows, stop["arrive"], stop["depart"], mode)
     if mode == "fast" and len(stops) > 1:
-        stops[0]["docs"] = stops[1]["docs"]   # 출발역: 다음 역에서 빨리 내리려면 어느 칸에 탈지
+        stops[0]["docs"] = stops[1]["docs"]   # 출발역: 다음에 내릴 역에서 빨리 내리려면 어느 칸에 탈지
 
-    def context(stop):
+    def context(stop, no):
+        """AI에게 알려 줄 열차 정보: 노선, 방향, 온 쪽·가는 쪽 역"""
         arrive, depart = stop["arrive"], stop["depart"]
-        ride = f"{arrive['line']} {arrive.get('direction') or ''} 열차를 타고 옴" if arrive else ""
-        nxt = f"{depart['line']} {depart.get('direction') or ''} 열차를 탐" if depart else ""
-        return " · ".join(v for v in (ride, nxt) if v)
+        parts = []
+        if arrive:
+            parts.append(f"{arrive['line']} {arrive.get('direction') or ''} 열차를 타고 옴 (온 쪽: {arrive.get('prev') or '?'}역)")
+        if depart:
+            parts.append(f"{depart['line']} {depart.get('direction') or ''} 열차를 탐 (가는 쪽: {depart.get('next') or '?'}역)")
+        if stop["kind"] == "출발" and no < len(stops):
+            parts.append(f"[다음에 내릴 역] {stops[no]['station']}역")
+        return " · ".join(parts)
 
     all_docs = [d for s in stops for d in s["docs"]]
     reply = {}
@@ -283,8 +320,9 @@ def guide_route(conn, legs, mode="fast"):
         blocks = []
         for no, stop in enumerate(stops, 1):
             facts = "\n".join(f"- ({d['source']}) {d['content']}" for d in stop["docs"]) or "(자료 없음)"
-            blocks.append(f"[{no}] {stop['kind']} {stop['station']}역 [열차] {context(stop)}\n{facts}")
-        reply = generate_json(ROUTE_RULES, f"[안내 방식] {MODES[mode]}\n\n" + "\n\n".join(blocks))
+            blocks.append(f"[{no}] {stop['kind']} {stop['station']}역 [열차] {context(stop, no)}\n{facts}")
+        # temperature 0: 같은 경로를 다시 눌러도 되도록 같은 답이 나오게 합니다(9-1 점검).
+        reply = generate_json(ROUTE_RULES, f"[안내 방식] {MODES[mode]}\n\n" + "\n\n".join(blocks), temperature=0)
     tips = {}
     for t in reply.get("tips") or []:
         if isinstance(t, dict) and str(t.get("no", "")).isdigit():
@@ -292,18 +330,23 @@ def guide_route(conn, legs, mode="fast"):
 
     result, dropped = [], 0
     for no, stop in enumerate(stops, 1):
-        tip = tips.get(no, "") if stop["docs"] else ""
-        if tip and not grounded(tip, stop["docs"], context(stop)):
-            tip, dropped = "", dropped + 1      # 자료에 없는 숫자가 있으면 AI 문장 대신 자료 원문을 보여 줌
+        docs = stop["docs"]
+        tip = tips.get(no, "") if docs else ""
+        wants_car = mode == "fast" and stop["kind"] == "출발" and any(CAR.search(d["content"]) for d in docs)
+        if tip and (not grounded(tip, docs, context(stop, no)) or (wants_car and not CAR.search(tip))):
+            tip, dropped = "", dropped + 1      # 자료에 없는 숫자가 있거나, 타야 할 칸 번호가 빠지면 자료 원문을 보여 줌
+        # 근거 자료 보기: 안내에 쓴 칸·출입구 번호가 들어 있는 줄을 앞에 둡니다.
+        used = set(NUMBER.findall(tip))
+        docs = sorted(docs, key=lambda d: -len(used & set(NUMBER.findall(d["content"]))))
         arrive, depart = stop["arrive"], stop["depart"]
         result.append({
             "kind": stop["kind"], "station": stop["station"],
             "line": (arrive or depart)["line"], "next_line": depart["line"] if arrive and depart else None,
             "tip": tip or None,
-            "facts": [d["content"] for d in stop["docs"][:3]],
+            "facts": [d["content"] for d in docs[:3]],
         })
     summary = str(reply.get("summary") or "").strip()
-    route_text = " ".join(context(s) for s in stops)
+    route_text = " ".join(context(s, i) for i, s in enumerate(stops, 1))
     if summary and not grounded(summary, all_docs, route_text):
         summary, dropped = "", dropped + 1
     return {"mode": mode, "mode_name": MODES[mode], "summary": summary or None, "stops": result,

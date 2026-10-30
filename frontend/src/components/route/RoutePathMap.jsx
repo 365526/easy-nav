@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import MAP from "../../data/metroMap.json";
 
 // 노선도 위에 경로 겹쳐 보기: 빠른 길은 핑크, 편한 길은 그린으로 그리고, 지금 고른 길을 위에 굵게 그립니다.
@@ -88,24 +88,35 @@ function routePaths(c) {
 const colorOf = (c) => (c.tags.includes("빠른 길") ? FAST : c.tags.includes("편한 길") ? CALM : OTHER);
 
 export default function RoutePathMap({ candidates, selected }) {
-  const frame = useRef(null);
+  // 노선도 칸(frame)이 화면에 생길 때마다 크기를 잽니다. 처음에 그릴 길이 없어 칸이 없었다가
+  // 다른 길을 눌러 칸이 생겨도 크기를 다시 재도록, ref 대신 상태(setFrame)로 받습니다(9-1 점검: 서울역 → 여의도).
+  const [frame, setFrame] = useState(null);
   const [size, setSize] = useState({ w: 800, h: 420 });
   useLayoutEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    if (!frame) return;
+    const measure = () => setSize({ w: frame.clientWidth, h: frame.clientHeight });
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(frame);
     return () => ro.disconnect();
-  }, []);
+  }, [frame]);
 
   // 빠른 길·편한 길과 지금 고른 길만 그리고, 고른 길을 맨 위에
   const shown = candidates.filter((c) => c.key === selected.key || c.tags.length > 0);
   const order = [...shown.filter((c) => c.key !== selected.key), selected];
   const drawn = order.map((c) => ({ c, paths: routePaths(c) }));
   const all = drawn.flatMap((d) => d.paths.flatMap((p) => p.pts));
-  if (all.length < 2) return null;
+  // 그릴 수 있는 길이 없으면 카드를 없애지 않고 이유를 알립니다(9-1 점검: 서울역 → 여의도, 노량진은 노선도에 없음).
+  if (all.length < 2) {
+    return (
+      <section aria-label="노선도 위 경로" className="flex flex-col gap-2 rounded-2xl border border-[#2C2366] bg-[#120E2E] p-4 md:p-5">
+        <h3 className="text-[18px] font-black">노선도에서 보기</h3>
+        <p className="text-[14px] leading-relaxed text-[#A9A6D6]">
+          이 길은 노선도에 없는 역(노량진 등 1호선 코레일 구간, 9호선)을 지나 그리지 못했습니다. 노선도에는 1~8호선의 서울 도심 구간이 들어 있습니다.
+        </p>
+      </section>
+    );
+  }
 
   // 그린 길 전체가 화면에 들어오도록 보기 범위를 정합니다. 둘레는 60px(글자 자리)를 비웁니다.
   const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
@@ -133,7 +144,7 @@ export default function RoutePathMap({ candidates, selected }) {
           ))}
         </span>
       </div>
-      <div ref={frame} className="h-[320px] overflow-hidden rounded-xl bg-[#0A0B1E] md:h-[420px]">
+      <div ref={setFrame} className="h-[320px] overflow-hidden rounded-xl bg-[#0A0B1E] md:h-[420px]">
         <svg
           viewBox={`${cx - w / 2} ${cy - h / 2} ${w} ${h}`}
           className="block h-full w-full"
@@ -196,6 +207,7 @@ export default function RoutePathMap({ candidates, selected }) {
       <p className="text-[12px] leading-relaxed text-[#6E6A9E]">
         카드를 누르면 그 길이 위에 굵게 그려집니다.
         {drawn.some((d) => d.paths.some((p) => p.dashed)) && " 점선은 노선도에 없는 노선(신분당선, 9호선 등) 구간입니다."}
+        {drawn.some((d) => d.paths.length < d.c.legs.length) && " 노선도에 없는 역(노량진 등)을 지나는 구간은 그리지 못했습니다."}
       </p>
     </section>
   );

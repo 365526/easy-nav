@@ -139,8 +139,11 @@ def route_legs(rides, table, destination):
         if known:
             value = round(sum(v * s for v, s in known) / sum(s for _, s in known), 1)
             average = {"congestion": value, **level_info(value)}
+        to = groups[i + 1]["from"] if i + 1 < len(groups) else destination
+        # prev: 내리는 역 바로 앞 역(타고 온 쪽), next: 타는 역 바로 다음 역(가는 쪽). AI 길잡이가 방면을 고를 때 씁니다(9-2).
+        nxt = g["rides"][1]["station"] if len(g["rides"]) > 1 else to
         legs.append({"line": g["line"], "from": g["from"], "direction": g["direction"],
-                     "to": groups[i + 1]["from"] if i + 1 < len(groups) else destination,
+                     "prev": g["rides"][-1]["station"], "next": nxt, "to": to,
                      "minutes": round(sum(r["seconds"] for r in g["rides"]) / 60), "average": average})
     return legs
 
