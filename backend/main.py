@@ -1,14 +1,16 @@
-"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API, 안내 도우미 (워크북 4~6, 7-1, 8)"""
+"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API, 안내 도우미 (워크북 4~6, 7-1, 8, 9)"""
 import os
 from datetime import datetime
+from typing import Literal
 
 import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
+from pydantic import BaseModel, ConfigDict, Field
 
-from guide import ask as guide_ask, search as guide_search
+from guide import ask as guide_ask, guide_route, search as guide_search
 from route_logic import MAX_EXTRA_MINUTES, avoid_candidates, describe_route, fetch_route, level_info, no_data_entry, rank_routes
 
 load_dotenv()
@@ -24,7 +26,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://easy-nav-iota.vercel.app", "http://localhost:5173"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -218,3 +220,27 @@ def ask_guide(question: str = Query(..., min_length=1, max_length=100, descripti
     sources는 답의 근거가 된 자료 이름과 기준일입니다. AI를 쓸 수 없으면 503 오류입니다."""
     with db() as conn:
         return guide_ask(conn, question, station)
+
+
+class RouteLeg(BaseModel):
+    """경로 추천(/routes/recommend) 결과의 legs 한 칸을 그대로 받습니다."""
+    model_config = ConfigDict(populate_by_name=True)
+    line: str = Field(..., max_length=20, description="호선. 예: 2호선")
+    start: str = Field(..., alias="from", max_length=30, description="이 노선을 타는 역")
+    to: str = Field(..., max_length=30, description="이 노선에서 내리는 역")
+    direction: str = Field("", max_length=10, description="상행·하행·내선·외선")
+
+
+class RouteGuideRequest(BaseModel):
+    legs: list[RouteLeg] = Field(..., min_length=1, max_length=6)
+    mode: Literal["fast", "easy"] = Field("fast", description="fast: 빨리 갈아타기 · easy: 휠체어·유모차")
+
+
+@app.post("/guide/route", tags=["안내 도우미"], summary="경로 길잡이: 출발·환승·도착역 안내를 한 번에")
+def route_guide(body: RouteGuideRequest):
+    """고른 경로의 출발·환승·도착역마다 빠른하차정보·교통약자이용정보를 모아, 그 자료로만 역별 안내를 한 줄씩 만듭니다.
+    안내 문장의 숫자(칸-문, 출입구 등)가 자료에 없으면 그 문장을 버리고 자료 원문(facts)만 돌려줍니다(dropped에 개수).
+    자료가 하나도 없으면 AI를 부르지 않습니다. AI를 쓸 수 없으면 503 오류입니다."""
+    legs = [leg.model_dump(by_alias=True) for leg in body.legs]
+    with db() as conn:
+        return guide_route(conn, legs, body.mode)

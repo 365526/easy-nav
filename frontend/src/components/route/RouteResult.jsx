@@ -1,5 +1,6 @@
 import { useState } from "react";
 import LevelBadge, { LEVELS, People } from "../LevelBadge.jsx";
+import RouteGuide from "../guide/RouteGuide.jsx";
 import RoutePathMap from "./RoutePathMap.jsx";
 import { addMinutes, lineColor, objectJosa, rerank, toLevel } from "./routeUtils.js";
 
@@ -276,6 +277,7 @@ export default function RouteResult({ data, timeWeight }) {
         {selected.average && <People n={selected.average.level} size={14} color={LEVELS[selected.average.level - 1].color} />}
       </div>
       <RoutePathMap candidates={ranked} selected={selected} />
+      <RouteGuide key={selected.key} route={selected} />
       <div className="grid gap-4 md:grid-cols-2">
         <Departures c={selected} />
         <Segments c={selected} />
