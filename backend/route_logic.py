@@ -130,7 +130,7 @@ def route_legs(rides, table, destination):
         if groups and groups[-1]["line"] == r["line"]:
             groups[-1]["rides"].append(r)
         else:
-            groups.append({"line": r["line"], "from": r["station"], "rides": [r]})
+            groups.append({"line": r["line"], "from": r["station"], "direction": r["direction"], "rides": [r]})
     legs = []
     for i, g in enumerate(groups):
         known = [(value_at(table, r), r["seconds"]) for r in g["rides"]]
@@ -139,7 +139,7 @@ def route_legs(rides, table, destination):
         if known:
             value = round(sum(v * s for v, s in known) / sum(s for _, s in known), 1)
             average = {"congestion": value, **level_info(value)}
-        legs.append({"line": g["line"], "from": g["from"],
+        legs.append({"line": g["line"], "from": g["from"], "direction": g["direction"],
                      "to": groups[i + 1]["from"] if i + 1 < len(groups) else destination,
                      "minutes": round(sum(r["seconds"] for r in g["rides"]) / 60), "average": average})
     return legs

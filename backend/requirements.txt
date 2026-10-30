@@ -4,3 +4,4 @@ python-dotenv
 pandas
 requests
 psycopg[binary]
+truststore>=0.10.0

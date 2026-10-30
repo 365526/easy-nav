@@ -1,8 +1,10 @@
-"""AI 안내 도우미: 근거 자료 찾기(워크북 8 1부)와 찾은 자료로만 답하기(2부)
+"""AI 안내 도우미 (워크북 8 1·2부, 워크북 9)
 
 RAG = Retrieval(찾기) + Generation(답 만들기)
-1) 찾기: 질문에서 역 이름과 궁금한 것(엘리베이터인지, 내리는 칸인지)을 골라 DB(guide_docs)에서 그 역의 자료만 꺼냅니다.
-2) 답 만들기: 찾은 자료 문장만 AI에게 넘기고, 자료에 없는 내용은 지어내지 말라고 지시합니다.
+- 묻고 답하기(8): 질문에서 역 이름과 궁금한 것을 골라 그 역의 자료만 찾고, 찾은 자료로만 짧게 답합니다.
+- 경로 길잡이(9): 고른 경로의 출발·환승·도착역마다 타고 온 노선·방향에 맞는 자료를 한꺼번에 모아
+  역마다 한 줄씩 안내합니다. 역마다 따로 찾아봐야 하는 정보를 대신 모아 주는 것이 목적입니다.
+환각 막기: AI에게는 찾은 자료만 넘기고, AI가 쓴 문장의 숫자(칸-문, 출입구, 층)가 자료에 있는지 서버가 한 번 더 확인합니다.
 """
 import json
 import os
@@ -16,9 +18,6 @@ from fastapi import HTTPException
 ELEVATOR_WORDS = ("엘리베이터", "승강기", "휠체어", "유모차", "교통약자", "캐리어", "무릎")
 EXIT_WORDS = ("빠른", "하차", "내리", "내릴", "칸", "계단", "에스컬레이터", "출구", "환승", "갈아")
 LIMIT = 20  # AI에게 넘길 자료는 많아야 20줄
-
-# 성공한 모델을 메모리에 캐싱하여 속도를 높이는 전역 변수
-WORKING_MODEL = None
 
 
 def name_keys(name):
@@ -70,7 +69,104 @@ def search(conn, question, station=""):
     return {"stations": stations, "sources": sources, "docs": rows[:LIMIT]}
 
 
-# ───────── 2부: 찾은 자료로만 답하기 ─────────
+# ───────── AI 부르기 (워크북 8 2부의 모델 자동 찾기를 함수 하나로 정리, 워크북 9) ─────────
+
+API = "https://generativelanguage.googleapis.com/v1beta"
+WORKING_MODEL = None  # 한 번 성공한 모델을 기억해 두고 다음 요청부터 바로 씁니다.
+
+
+def make_opener():
+    """구글 AI 서버에 연결할 도구. 인증서는 운영체제(Windows·Linux)의 인증서 저장소로 검사합니다(truststore).
+    학교망·보안 프로그램이 HTTPS를 중간에서 검사해도, 그 인증서가 Windows에 등록되어 있으면 검사를 끄지 않고 연결됩니다.
+    그래도 막힐 때만 내 컴퓨터의 backend\\.env에 LLM_INSECURE_SSL=1을 적어 검사를 끕니다. 배포 서버(Render)에는 적지 않습니다."""
+    try:
+        import truststore
+        context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except ImportError:          # truststore를 아직 설치하지 않았으면 파이썬 기본 인증서 목록으로 검사
+        context = ssl.create_default_context()
+    if os.environ.get("LLM_INSECURE_SSL", "").strip() == "1":
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=context))
+
+
+def call_model(opener, model, key, data):
+    """모델 하나에 요청을 보내고, AI가 돌려준 JSON 글자를 파이썬 값으로 바꿉니다."""
+    request = urllib.request.Request(f"{API}/{model}:generateContent", data=data, method="POST",
+                                     headers={"x-goog-api-key": key, "Content-Type": "application/json"})
+    with opener.open(request, timeout=30) as resp:
+        parts = json.loads(resp.read().decode("utf-8"))["candidates"][0]["content"]["parts"]
+    text = "".join(p.get("text", "") for p in parts).strip()
+    return json.loads(re.sub(r"^```(json)?|```$", "", text, flags=re.MULTILINE).strip())
+
+
+def model_order(name):
+    """자동 찾기 순서: flash 계열을 먼저, 사용 한도가 빨리 차는 2.5는 뒤로"""
+    score = 0
+    if "flash" in name:
+        score -= 10
+    if "2.0" in name or "1.5" in name:
+        score -= 5
+    if "2.5" in name:
+        score += 100
+    return score
+
+
+def generate_json(rules, prompt):
+    """AI에게 규칙(rules)과 내용(prompt)을 보내 JSON 답을 받습니다.
+    1순위: 기억해 둔 모델 → 2순위: .env의 LLM_MODEL → 그래도 안 되면 쓸 수 있는 모델 목록을 받아 차례로 시도합니다."""
+    global WORKING_MODEL
+    key = os.environ.get("LLM_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(503, "서버에 AI 인증키(LLM_API_KEY)가 없습니다.")
+    data = json.dumps({
+        "systemInstruction": {"parts": [{"text": rules}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048, "responseMimeType": "application/json"},
+    }).encode("utf-8")
+    opener = make_opener()
+
+    env_model = os.environ.get("LLM_MODEL", "").strip()
+    if env_model and not env_model.startswith("models/"):
+        env_model = f"models/{env_model}"
+    first = WORKING_MODEL or env_model
+    if first:
+        try:
+            reply = call_model(opener, first, key, data)
+            WORKING_MODEL = first
+            return reply
+        except Exception:
+            WORKING_MODEL = None   # 기억해 둔 모델이 안 되면 아래에서 다시 찾습니다.
+
+    try:
+        # 인증키는 주소가 아니라 머리글(x-goog-api-key)로 보냅니다. 주소에 넣으면 기록(log)에 남을 수 있습니다.
+        request = urllib.request.Request(f"{API}/models?pageSize=200", headers={"x-goog-api-key": key})
+        with opener.open(request, timeout=10) as resp:
+            models = json.loads(resp.read().decode("utf-8")).get("models", [])
+    except Exception as e:
+        raise HTTPException(503, f"AI 모델 목록을 받지 못했습니다. ({type(e).__name__})")
+    names = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+    if not names:
+        raise HTTPException(503, "이 인증키로 답을 만들 수 있는 AI 모델이 없습니다.")
+
+    last_error = ""
+    for name in sorted(names, key=model_order):
+        if name == first:
+            continue
+        try:
+            reply = call_model(opener, name, key, data)
+            WORKING_MODEL = name
+            print(f"[AI] {name} 모델로 연결했습니다. 다음 요청부터 이 모델을 씁니다.")
+            return reply
+        except urllib.error.HTTPError as e:
+            last_error = f"{name} {e.code}"
+        except Exception as e:
+            last_error = f"{name} {type(e).__name__}"
+    raise HTTPException(503, f"AI 답을 받지 못했습니다. (마지막 오류: {last_error})")
+
+
+# ───────── 8 2부: 찾은 자료로만 답하기 ─────────
 
 SOURCE_NAMES = {"빠른하차정보": "서울교통공사 빠른하차정보", "교통약자이용정보": "서울교통공사 교통약자이용정보"}
 NOT_FOUND = "안내를 찾지 못했어요. 역 이름과 함께 엘리베이터 위치나 빨리 내리는 칸을 물어봐 주세요."
@@ -84,96 +180,18 @@ RULES = """너는 서울 지하철 안내 도우미다.
 
 
 def ask_llm(question, docs):
-    global WORKING_MODEL
-    
-    key = os.environ.get("LLM_API_KEY", "").strip()
-    if not key:
-        raise HTTPException(503, "서버에 AI 인증키(LLM_API_KEY)가 없습니다.")
-
     facts = "\n".join(f"- ({d['source']}) {d['content']}" for d in docs)
-    body = {
-        "systemInstruction": {"parts": [{"text": RULES}]},
-        "contents": [{"role": "user", "parts": [{"text": f"[자료]\n{facts}\n\n[질문]\n{question}"}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048, "responseMimeType": "application/json"},
-    }
-    data = json.dumps(body).encode("utf-8")
+    reply = generate_json(RULES, f"[자료]\n{facts}\n\n[질문]\n{question}")
+    return {"found": bool(reply.get("found")), "answer": str(reply.get("answer") or "").strip()}
 
-    # SSL 및 프록시 차단 우회 설정
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=context))
 
-    # [고속 경로] 1순위: 성공 기록 캐시 / 2순위: .env 설정값
-    env_model = os.environ.get("LLM_MODEL", "").strip()
-    if env_model and not env_model.startswith("models/"):
-        env_model = f"models/{env_model}"
-        
-    fast_targets = []
-    if WORKING_MODEL:
-        fast_targets.append(WORKING_MODEL)
-    elif env_model:
-        fast_targets.append(env_model)
-
-    for target in fast_targets:
-        url = f"https://generativelanguage.googleapis.com/v1beta/{target}:generateContent"
-        req = urllib.request.Request(url, data=data, headers={"x-goog-api-key": key, "Content-Type": "application/json"}, method="POST")
-        try:
-            with opener.open(req, timeout=30) as resp:
-                res_body = resp.read().decode("utf-8")
-                parts = json.loads(res_body)["candidates"][0]["content"]["parts"]
-                text = "".join(p.get("text", "") for p in parts).strip()
-                reply = json.loads(re.sub(r"^```(json)?|```$", "", text, flags=re.MULTILINE).strip())
-                WORKING_MODEL = target  # 성공하면 캐시에 저장
-                return {"found": bool(reply["found"]), "answer": str(reply["answer"]).strip()}
-        except Exception:
-            if target == WORKING_MODEL:
-                WORKING_MODEL = None  # 캐시된 모델이 죽었다면 초기화
-            pass # 실패 시 아래의 자동 탐색 로직으로 넘어감
-
-    # [탐색 경로] 위 방법이 모두 실패했을 때만 구글 서버에서 모델 리스트를 불러와 시도
-    try:
-        req_models = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models?key={key}")
-        with opener.open(req_models, timeout=10) as resp:
-            models_data = json.loads(resp.read().decode("utf-8"))
-            valid_models = [m["name"] for m in models_data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
-    except Exception as e:
-        raise HTTPException(503, f"가용 모델 목록 조회 실패: {str(e)}")
-
-    if not valid_models:
-        raise HTTPException(503, "해당 API 키로 답변 생성을 지원하는 모델이 하나도 없습니다.")
-
-    # 안정적인 flash 계열을 먼저 시도하도록 정렬 (제한이 걸린 2.5는 후순위로 미룸)
-    def sort_key(name):
-        score = 0
-        if "flash" in name: score -= 10
-        if "2.0" in name: score -= 5
-        if "1.5" in name: score -= 5
-        if "2.5" in name: score += 100
-        return score
-        
-    last_err = ""
-    for model_name in sorted(valid_models, key=sort_key):
-        url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent"
-        req = urllib.request.Request(url, data=data, headers={"x-goog-api-key": key, "Content-Type": "application/json"}, method="POST")
-        try:
-            with opener.open(req, timeout=30) as resp:
-                res_body = resp.read().decode("utf-8")
-                parts = json.loads(res_body)["candidates"][0]["content"]["parts"]
-                text = "".join(p.get("text", "") for p in parts).strip()
-                reply = json.loads(re.sub(r"^```(json)?|```$", "", text, flags=re.MULTILINE).strip())
-                WORKING_MODEL = model_name
-                print(f"\n✅ [Gemini API] 탐색 성공. 이후 요청은 {WORKING_MODEL} 캐시를 사용합니다.\n")
-                return {"found": bool(reply["found"]), "answer": str(reply["answer"]).strip()}
-        except urllib.error.HTTPError as e:
-            err_text = e.read().decode("utf-8") if e.fp else ""
-            last_err = f"[{model_name}] {e.code}: {err_text[:100]}"
-            continue
-        except Exception as e:
-            last_err = f"[{model_name}] {type(e).__name__}: {str(e)}"
-            continue
-
-    raise HTTPException(503, f"가용 모델 전체 호출 실패. (마지막 에러: {last_err})")
+def source_list(docs):
+    """근거: 쓴 자료의 이름과 기준일 (같은 자료는 가장 늦은 기준일 하나만)"""
+    dates = {}
+    for d in docs:
+        day = d["base_date"].isoformat() if d["base_date"] else ""
+        dates[d["source"]] = max(dates.get(d["source"], ""), day)
+    return [{"name": SOURCE_NAMES[s], "base_date": day or None} for s, day in dates.items()]
 
 
 def ask(conn, question, station=""):
@@ -184,10 +202,109 @@ def ask(conn, question, station=""):
     reply = ask_llm(question, found["docs"])
     if not reply["found"] or not reply["answer"]:
         return {"found": False, "answer": NOT_FOUND, "stations": found["stations"], "sources": []}
-    # 근거: 답에 쓴 자료의 이름과 기준일 (같은 자료는 가장 늦은 기준일 하나만)
-    dates = {}
-    for d in found["docs"]:
-        day = d["base_date"].isoformat() if d["base_date"] else ""
-        dates[d["source"]] = max(dates.get(d["source"], ""), day)
-    sources = [{"name": SOURCE_NAMES[s], "base_date": day or None} for s, day in dates.items()]
-    return {"found": True, "answer": reply["answer"], "stations": found["stations"], "sources": sources}
+    return {"found": True, "answer": reply["answer"], "stations": found["stations"], "sources": source_list(found["docs"])}
+
+
+# ───────── 워크북 9: 경로 길잡이 (경로 전체를 한 번에) ─────────
+
+MODES = {"fast": "빨리 갈아타기", "easy": "휠체어·유모차"}
+STOP_LIMIT = 8  # 역 하나에 넘길 자료는 많아야 8줄
+NUMBER = re.compile(r"\d+(?:-\d+)?")  # 숫자 덩어리. 예: 3-2(칸-문), 4(번 출구), 2(호선)
+
+ROUTE_RULES = """너는 서울 지하철 길잡이다. 경로의 역마다 번호와 [자료]가 주어진다.
+- 각 역의 tip은 그 번호의 자료에 적힌 내용만 근거로 쓴다. 자료에 없는 칸 번호, 출입구 번호, 층, 위치는 절대 지어내지 않는다.
+- 자료가 '(자료 없음)'인 역은 tip을 빈 글자로 둔다.
+- 칸-문 번호(예: 3-2)는 자료에 적힌 그대로 옮긴다. 방면이 여럿이면 [열차]의 방향과 같은 줄을 고른다.
+- 빨리 갈아타기: 출발역은 다음 역에서 빨리 내리기 좋은 칸에 타라고 하고, 환승·도착역은 내릴 때 가까운 칸과 무엇(계단, 에스컬레이터, 엘리베이터)이 가까운지 알려 준다.
+- 휠체어·유모차: 엘리베이터와 가까운 칸, 엘리베이터 위치와 출입구를 알려 준다.
+- 자료에 '환승'이라는 말이 없으면 환승 통로와 가깝다고 말하지 않는다.
+- tip은 한국어 '~요' 체 한 문장으로 60자 안쪽. summary는 경로 전체를 한 문장으로 요약한다.
+- {"summary": "요약", "tips": [{"no": 번호, "tip": "안내"}]} 모양의 JSON으로만 답한다."""
+
+
+def same_line(a, b):
+    """'2호선'과 '02호선'처럼 표기가 조금 달라도 같은 노선으로 봅니다."""
+    norm = lambda s: re.sub(r"^0+", "", (s or "").replace(" ", ""))
+    return norm(a) == norm(b)
+
+
+def route_stops(legs):
+    """노선별 구간(legs) → 출발·환승·도착역 목록. 역마다 타고 온 구간(arrive)과 갈아탈 구간(depart)을 붙입니다."""
+    stops = [{"kind": "출발", "station": legs[0]["from"], "arrive": None, "depart": legs[0]}]
+    for i, leg in enumerate(legs):
+        last = i == len(legs) - 1
+        stops.append({"kind": "도착" if last else "환승", "station": leg["to"],
+                      "arrive": leg, "depart": None if last else legs[i + 1]})
+    return stops
+
+
+def stop_docs(rows, arrive, depart, mode):
+    """역 하나의 자료(rows) 중 이 경로에 맞는 줄만 고릅니다.
+    빠른하차정보: 타고 온 노선, 그중 방향(상행·하행·내선·외선)이 같은 줄. 방향 표기가 달라 없으면 노선만 맞춥니다.
+    교통약자이용정보(엘리베이터): 타고 온 노선과 갈아탈 노선. 휠체어·유모차 안내에서만 씁니다."""
+    exits = [r for r in rows if r["source"] == "빠른하차정보" and arrive and same_line(r["line"], arrive["line"])]
+    same_way = [r for r in exits if (r["raw"] or {}).get("upbdnbSe") == arrive.get("direction")] if arrive else []
+    exits = same_way or exits
+    if mode == "fast":
+        return exits[:STOP_LIMIT]
+    lifts = [r for r in rows if r["source"] == "교통약자이용정보"
+             and any(leg and same_line(r["line"], leg["line"]) for leg in (arrive, depart))]
+    return (lifts[:4] + [r for r in exits if "엘리베이터" in r["content"]])[:STOP_LIMIT]
+
+
+def grounded(text, docs, context):
+    """AI가 쓴 문장의 숫자가 모두 자료(또는 경로 정보)에 있는지 확인합니다. 하나라도 없으면 지어낸 것으로 봅니다."""
+    allowed = set(NUMBER.findall(" ".join(d["content"] for d in docs) + " " + context))
+    return all(n in allowed for n in NUMBER.findall(text))
+
+
+def guide_route(conn, legs, mode="fast"):
+    """경로 길잡이: 역마다 자료를 모으고(찾기), 모은 자료로만 역별 안내를 만들고(답 만들기), 숫자를 확인합니다."""
+    names = [r["station"] for r in conn.execute("select distinct station from guide_docs").fetchall()]
+    stops = route_stops(legs)
+    for stop in stops:
+        matched = find_stations(stop["station"], names)
+        rows = conn.execute(
+            "select source, line, station, content, raw, base_date from guide_docs where station = %s order by id",
+            (matched[0],)).fetchall() if matched else []
+        stop["docs"] = stop_docs(rows, stop["arrive"], stop["depart"], mode)
+    if mode == "fast" and len(stops) > 1:
+        stops[0]["docs"] = stops[1]["docs"]   # 출발역: 다음 역에서 빨리 내리려면 어느 칸에 탈지
+
+    def context(stop):
+        arrive, depart = stop["arrive"], stop["depart"]
+        ride = f"{arrive['line']} {arrive.get('direction') or ''} 열차를 타고 옴" if arrive else ""
+        nxt = f"{depart['line']} {depart.get('direction') or ''} 열차를 탐" if depart else ""
+        return " · ".join(v for v in (ride, nxt) if v)
+
+    all_docs = [d for s in stops for d in s["docs"]]
+    reply = {}
+    if all_docs:
+        blocks = []
+        for no, stop in enumerate(stops, 1):
+            facts = "\n".join(f"- ({d['source']}) {d['content']}" for d in stop["docs"]) or "(자료 없음)"
+            blocks.append(f"[{no}] {stop['kind']} {stop['station']}역 [열차] {context(stop)}\n{facts}")
+        reply = generate_json(ROUTE_RULES, f"[안내 방식] {MODES[mode]}\n\n" + "\n\n".join(blocks))
+    tips = {}
+    for t in reply.get("tips") or []:
+        if isinstance(t, dict) and str(t.get("no", "")).isdigit():
+            tips[int(t["no"])] = str(t.get("tip") or "").strip()
+
+    result, dropped = [], 0
+    for no, stop in enumerate(stops, 1):
+        tip = tips.get(no, "") if stop["docs"] else ""
+        if tip and not grounded(tip, stop["docs"], context(stop)):
+            tip, dropped = "", dropped + 1      # 자료에 없는 숫자가 있으면 AI 문장 대신 자료 원문을 보여 줌
+        arrive, depart = stop["arrive"], stop["depart"]
+        result.append({
+            "kind": stop["kind"], "station": stop["station"],
+            "line": (arrive or depart)["line"], "next_line": depart["line"] if arrive and depart else None,
+            "tip": tip or None,
+            "facts": [d["content"] for d in stop["docs"][:3]],
+        })
+    summary = str(reply.get("summary") or "").strip()
+    route_text = " ".join(context(s) for s in stops)
+    if summary and not grounded(summary, all_docs, route_text):
+        summary, dropped = "", dropped + 1
+    return {"mode": mode, "mode_name": MODES[mode], "summary": summary or None, "stops": result,
+            "dropped": dropped, "sources": source_list(all_docs)}
