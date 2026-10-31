@@ -7,7 +7,7 @@ import MAP from "../../data/metroMap.json";
 //  - 화면은 그린 길에 맞춰 확대해 보여 주고, 끌거나 확대하지 않습니다. 선 굵기와 글자는 화면 px 기준으로 맞춥니다.
 
 const FAST = "#FF2E97";
-const CALM = "#39FFB0";
+const COMFY = "#39FFB0";
 const OTHER = "#22E5FF";
 // 최단경로 API의 역 이름 → 노선도의 역 이름 (같은 역을 다르게 부르는 곳)
 const ALIAS = { 이수: "총신대입구" };
@@ -85,7 +85,7 @@ function routePaths(c) {
     .filter(Boolean);
 }
 
-const colorOf = (c) => (c.tags.includes("빠른 길") ? FAST : c.tags.includes("편한 길") ? CALM : OTHER);
+const colorOf = (c) => (c.tags.includes("빠른 길") ? FAST : c.tags.includes("편한 길") ? COMFY : OTHER);
 
 export default function RoutePathMap({ candidates, selected }) {
   // 노선도 칸(frame)이 화면에 생길 때마다 크기를 잽니다. 처음에 그릴 길이 없어 칸이 없었다가

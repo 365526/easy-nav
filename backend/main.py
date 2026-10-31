@@ -1,4 +1,4 @@
-"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API, 안내 도우미 (워크북 4~6, 7-1, 8, 9)"""
+"""easy-nav 서버: 역 검색, 혼잡도 조회, 경로 혼잡도 계산, 경로 추천, 분석용 API, 안내 도우미 (워크북 4~6, 7-1, 8, 9, 10)"""
 import os
 from datetime import datetime
 from typing import Literal
@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from guide import ask as guide_ask, guide_route, search as guide_search
 from route_logic import MAX_EXTRA_MINUTES, avoid_candidates, describe_route, fetch_route, level_info, no_data_entry, rank_routes
+from terms import ask_terms, terms_info
 
 load_dotenv()
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -235,7 +236,7 @@ class RouteLeg(BaseModel):
 
 class RouteGuideRequest(BaseModel):
     legs: list[RouteLeg] = Field(..., min_length=1, max_length=6)
-    mode: Literal["fast", "easy"] = Field("fast", description="fast: 빨리 갈아타기 · easy: 휠체어·유모차")
+    mode: Literal["fast", "access"] = Field("fast", description="fast: 빨리 갈아타기 · access: 휠체어·유모차 (계단 없이 엘리베이터로)")
 
 
 @app.post("/guide/route", tags=["안내 도우미"], summary="경로 길잡이: 출발·환승·도착역 안내를 한 번에")
@@ -246,3 +247,17 @@ def route_guide(body: RouteGuideRequest):
     legs = [leg.model_dump(by_alias=True) for leg in body.legs]
     with db() as conn:
         return guide_route(conn, legs, body.mode)
+
+
+@app.get("/guide/terms", tags=["안내 도우미"], summary="이용 규정 묻기 (여객운송약관 조항으로만 답함)")
+def ask_terms_api(question: str = Query(..., min_length=1, max_length=100, description="예: 자전거 가지고 타도 돼?")):
+    """여객운송약관(data/terms.txt)에서 질문과 가장 많이 겹치는 조항 3개를 찾아, 그 조항만 AI에게 넘겨 답합니다.
+    articles는 답의 근거 조항입니다. AI 답의 숫자나 조항 번호가 찾은 조항과 맞지 않으면 checked: false와 조항 원문을 돌려줍니다.
+    찾은 조항이 없으면 AI를 부르지 않고 found: false입니다."""
+    return ask_terms(question)
+
+
+@app.get("/guide/terms/info", tags=["안내 도우미"], summary="약관 파일 읽기 확인")
+def terms_info_api():
+    """data/terms.txt를 조항으로 잘 나눴는지 확인합니다. 조항 수, 처음·마지막 조항, 빠진 조항 번호를 돌려줍니다."""
+    return terms_info()

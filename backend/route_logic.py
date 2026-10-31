@@ -208,13 +208,13 @@ def rank_routes(candidates, time_weight):
     scored = [c for c in candidates if c["average"]]
     unscored = [c for c in candidates if not c["average"]]
     fastest = min(scored, key=lambda c: (c["total_minutes"], c["average"]["congestion"]))
-    calmest = min(scored, key=lambda c: (c["average"]["congestion"], c["total_minutes"]))
+    comfiest = min(scored, key=lambda c: (c["average"]["congestion"], c["total_minutes"]))
     best_minutes = fastest["total_minutes"]
-    best_congestion = calmest["average"]["congestion"]
+    best_congestion = comfiest["average"]["congestion"]
     for c in scored:
         c["score"] = round(time_weight * c["total_minutes"] / best_minutes
                            + (1 - time_weight) * c["average"]["congestion"] / best_congestion, 3)
-        c["tags"] = [tag for tag, who in (("빠른 길", fastest), ("편한 길", calmest)) if c is who]
+        c["tags"] = [tag for tag, who in (("빠른 길", fastest), ("편한 길", comfiest)) if c is who]
         c["vs_fastest"] = {
             "extra_minutes": round(c["total_minutes"] - best_minutes, 1),
             "congestion_down": round(fastest["average"]["congestion"] - c["average"]["congestion"], 1),
