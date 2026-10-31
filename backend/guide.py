@@ -207,7 +207,7 @@ def ask(conn, question, station=""):
 
 # ───────── 워크북 9·9-2: 경로 길잡이 (경로 전체를 한 번에) ─────────
 
-MODES = {"fast": "빨리 갈아타기", "easy": "휠체어·유모차"}
+MODES = {"fast": "빨리 갈아타기", "access": "휠체어·유모차"}  # Fast or Comfy의 comfy(편한 길)와 헷갈리지 않게 access(접근성)
 STOP_LIMIT = 8  # 역 하나에 넘길 자료는 많아야 8줄
 NUMBER = re.compile(r"\d+(?:-\d+)?")  # 숫자 덩어리. 예: 3-2(칸-문), 4(번 출구), 2(호선)
 CAR = re.compile(r"\d+-\d+")          # 칸-문 번호. 예: 3-2
