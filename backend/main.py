@@ -251,9 +251,9 @@ def route_guide(body: RouteGuideRequest):
 
 @app.get("/guide/terms", tags=["안내 도우미"], summary="이용 규정 묻기 (여객운송약관 조항으로만 답함)")
 def ask_terms_api(question: str = Query(..., min_length=1, max_length=100, description="예: 자전거 가지고 타도 돼?")):
-    """여객운송약관(data/terms.txt)에서 질문과 가장 많이 겹치는 조항 3개를 찾아, 그 조항만 AI에게 넘겨 답합니다.
+    """여객운송약관(data/terms.txt)에서 AI가 약관 용어로 바꾼 질문(keywords)과 가장 많이 겹치는 조항 3개를 찾아, 그 조항만 AI에게 넘겨 답합니다.
     articles는 답의 근거 조항입니다. AI 답의 숫자나 조항 번호가 찾은 조항과 맞지 않으면 checked: false와 조항 원문을 돌려줍니다.
-    찾은 조항이 없으면 AI를 부르지 않고 found: false입니다."""
+    찾은 조항이 없으면 답하는 AI를 부르지 않고 found: false입니다."""
     return ask_terms(question)
 
 

@@ -36,7 +36,7 @@ const DONE = "역마다 공공데이터에서 찾은 안내를 모았어요.";
 const EMPTY = "이 길의 역들은 서울교통공사 자료(1~8호선)에 안내가 없어 만들지 못했어요.";
 const FAIL = "지금은 답을 가져오지 못했어요. 잠시 뒤 다시 해 주세요.";
 const MIN_WORK = 1200; // 답이 빨리 와도 "찾는 중"을 이만큼(ms)은 보여 줌
-const NO_ANSWER = { answer: "", sources: [], articles: [], checked: true };
+const NO_ANSWER = { answer: "", sources: [], articles: [], checked: true, keywords: [] };
 
 const stationName = (name) => (name.endsWith("역") ? name : `${name}역`);
 
@@ -45,13 +45,20 @@ function toAnswer(topic, data) {
   if (topic === "terms") {
     const day = data.source?.base_date ? ` (${data.source.base_date} 기준)` : "";
     const names = data.articles.map((a) => `${a.no}(${a.title})`).join(", ");
-    return { answer: data.answer, sources: data.articles.length ? [`${data.source.name} ${names}${day}`] : [], articles: data.articles, checked: data.checked };
+    return {
+      answer: data.answer,
+      sources: data.articles.length ? [`${data.source.name} ${names}${day}`] : [],
+      articles: data.articles,
+      checked: data.checked,
+      keywords: data.keywords || [], // 질문을 바꾼 약관 용어 (워크북 10-1)
+    };
   }
   return {
     answer: data.answer,
     sources: (data.sources || []).map((s) => (s.base_date ? `${s.name} (${s.base_date} 기준)` : s.name)),
     articles: [],
     checked: true,
+    keywords: [],
   };
 }
 
@@ -269,6 +276,9 @@ export default function RouteGuide({ route = null, station = "" }) {
               </p>
               {asking && phase === "reply" && answer.sources.length > 0 && (
                 <p className="mt-2 text-[12px] text-[#8A86B8]">근거: {answer.sources.join(" · ")}</p>
+              )}
+              {asking && phase === "reply" && answer.keywords.length > 0 && (
+                <p className="mt-1 text-[12px] text-[#8A86B8]">약관 용어로 바꿔 찾았어요: {answer.keywords.join(" · ")}</p>
               )}
             </div>
           </div>
