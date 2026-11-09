@@ -19,11 +19,11 @@ function CoverageNote({ c }) {
 }
 
 // 빠른 길과 편한 길을 한 줄로 비교합니다. 비교할 수 없는 경우에는 그 이유를 그대로 알립니다.
-function Summary({ ranked, fastest, calmest }) {
+function Summary({ ranked, fastest, comfiest }) {
   const unscored = ranked.filter((c) => !c.average);
-  if (fastest.key !== calmest.key) {
-    const extra = calmest.total_minutes - fastest.total_minutes;
-    const down = fastest.average.level - calmest.average.level;
+  if (fastest.key !== comfiest.key) {
+    const extra = comfiest.total_minutes - fastest.total_minutes;
+    const down = fastest.average.level - comfiest.average.level;
     // 시간도 단계도 같으면 "+0분 · 단계 같음" 대신 문장으로 알립니다(9-1 점검: 노원 → 이수).
     if (Math.round(extra) === 0 && down === 0) {
       return (
@@ -32,7 +32,7 @@ function Summary({ ranked, fastest, calmest }) {
           <p className="mt-2 text-[20px] font-black leading-snug md:text-[24px]">
             같은 시간에 조금 덜 붐비는 길이 있습니다.
             <br />
-            단계는 같고, 평균 혼잡도가 {pct(fastest.average.congestion)} → {pct(calmest.average.congestion)}로 낮습니다.
+            단계는 같고, 평균 혼잡도가 {pct(fastest.average.congestion)} → {pct(comfiest.average.congestion)}로 낮습니다.
           </p>
         </section>
       );
@@ -50,13 +50,13 @@ function Summary({ ranked, fastest, calmest }) {
               {down > 0 ? `${down}단계 ↓` : "단계 같음"}
             </p>
             <p className="mt-2 text-[14px] text-[#A9A6D6]">
-              평균 {pct(fastest.average.congestion)} → {pct(calmest.average.congestion)}
+              평균 {pct(fastest.average.congestion)} → {pct(comfiest.average.congestion)}
             </p>
           </div>
         </div>
-        {calmest.coverage < 100 && (
+        {comfiest.coverage < 100 && (
           <p className="mt-4 text-[13px] text-[#A9A6D6]">
-            편한 길의 {calmest.no_data_lines.join(", ")} 구간은 혼잡도 자료가 없어 나머지 구간으로 계산했습니다.
+            편한 길의 {comfiest.no_data_lines.join(", ")} 구간은 혼잡도 자료가 없어 나머지 구간으로 계산했습니다.
           </p>
         )}
       </section>
@@ -266,12 +266,12 @@ export default function RouteResult({ data, timeWeight }) {
   const [picked, setPicked] = useState(null);
   const selected = ranked.find((c) => c.key === picked) || ranked[0];
   const fastest = ranked.find((c) => c.tags.includes("빠른 길")) || ranked[0];
-  const calmest = ranked.find((c) => c.tags.includes("편한 길")) || ranked[0];
+  const comfiest = ranked.find((c) => c.tags.includes("편한 길")) || ranked[0];
   const departAt = String(data.depart_time).slice(11, 16);
 
   return (
     <div className="flex flex-col gap-6">
-      <Summary ranked={ranked} fastest={fastest} calmest={calmest} />
+      <Summary ranked={ranked} fastest={fastest} comfiest={comfiest} />
       <div>
         <h2 className="text-[20px] font-black">후보 경로 {ranked.length}개</h2>
         <p className="mt-1 text-[14px] text-[#A9A6D6]">
