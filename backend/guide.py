@@ -91,8 +91,20 @@ def make_opener():
     return urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=context))
 
 
-def call_model(opener, model, key, data):
-    """모델 하나에 요청을 보내고, AI가 돌려준 JSON 글자를 파이썬 값으로 바꿉니다."""
+def model_version(name):
+    """모델 이름에서 버전 숫자를 꺼냅니다. models/gemini-3.5-flash-lite → 3.5, 숫자가 없으면 0"""
+    found = re.search(r"gemini-(\d+(?:\.\d+)?)", name)
+    return float(found.group(1)) if found else 0.0
+
+
+def call_model(opener, model, key, body):
+    """모델 하나에 요청을 보내고, AI가 돌려준 JSON 글자를 파이썬 값으로 바꿉니다.
+    3 이상 모델은 답하기 전에 생각(thinking)을 하고, 그 글자도 maxOutputTokens 안에서 씁니다. 그래서 생각을 짧게(low) 하게 합니다."""
+    config = dict(body["generationConfig"])
+    if model_version(model) >= 3:
+        config.pop("temperature", None)  # 구글 안내: 3 이상은 온도를 1.0 아래로 낮추면 같은 말을 되풀이할 수 있어 기본값으로 둡니다.
+        config["thinkingConfig"] = {"thinkingLevel": "low"}
+    data = json.dumps({**body, "generationConfig": config}).encode("utf-8")
     request = urllib.request.Request(f"{API}/{model}:generateContent", data=data, method="POST",
                                      headers={"x-goog-api-key": key, "Content-Type": "application/json"})
     with opener.open(request, timeout=30) as resp:
@@ -101,16 +113,12 @@ def call_model(opener, model, key, data):
     return json.loads(re.sub(r"^```(json)?|```$", "", text, flags=re.MULTILINE).strip())
 
 
+SKIP_WORDS = ("tts", "image", "live", "audio", "transcribe", "robotics", "computer", "embedding")  # 글로 답하지 않는 모델
+
+
 def model_order(name):
-    """자동 찾기 순서: flash 계열을 먼저, 사용 한도가 빨리 차는 2.5는 뒤로"""
-    score = 0
-    if "flash" in name:
-        score -= 10
-    if "2.0" in name or "1.5" in name:
-        score -= 5
-    if "2.5" in name:
-        score += 100
-    return score
+    """자동 찾기 순서: flash 계열을 먼저, 정식(preview·exp가 아닌) 모델을 먼저, 그 안에서는 버전이 높은 것부터"""
+    return ("flash" not in name, "preview" in name or "exp" in name, -model_version(name))
 
 
 def generate_json(rules, prompt, temperature=0.2):
@@ -120,11 +128,11 @@ def generate_json(rules, prompt, temperature=0.2):
     key = os.environ.get("LLM_API_KEY", "").strip()
     if not key:
         raise HTTPException(503, "서버에 AI 인증키(LLM_API_KEY)가 없습니다.")
-    data = json.dumps({
+    body = {
         "systemInstruction": {"parts": [{"text": rules}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": temperature, "maxOutputTokens": 2048, "responseMimeType": "application/json"},
-    }).encode("utf-8")
+        "generationConfig": {"temperature": temperature, "maxOutputTokens": 4096, "responseMimeType": "application/json"},
+    }
     opener = make_opener()
 
     env_model = os.environ.get("LLM_MODEL", "").strip()
@@ -133,10 +141,13 @@ def generate_json(rules, prompt, temperature=0.2):
     first = WORKING_MODEL or env_model
     if first:
         try:
-            reply = call_model(opener, first, key, data)
+            reply = call_model(opener, first, key, body)
+            if WORKING_MODEL != first:
+                print(f"[AI] {first} 모델로 연결했습니다.")
             WORKING_MODEL = first
             return reply
-        except Exception:
+        except Exception as e:
+            print(f"[AI] {first} 모델이 답하지 않아 다른 모델을 찾습니다. ({getattr(e, 'code', type(e).__name__)})")
             WORKING_MODEL = None   # 기억해 둔 모델이 안 되면 아래에서 다시 찾습니다.
 
     try:
@@ -146,7 +157,8 @@ def generate_json(rules, prompt, temperature=0.2):
             models = json.loads(resp.read().decode("utf-8")).get("models", [])
     except Exception as e:
         raise HTTPException(503, f"AI 모델 목록을 받지 못했습니다. ({type(e).__name__})")
-    names = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+    names = [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])
+             and not any(word in m["name"] for word in SKIP_WORDS)]
     if not names:
         raise HTTPException(503, "이 인증키로 답을 만들 수 있는 AI 모델이 없습니다.")
 
@@ -155,7 +167,7 @@ def generate_json(rules, prompt, temperature=0.2):
         if name == first:
             continue
         try:
-            reply = call_model(opener, name, key, data)
+            reply = call_model(opener, name, key, body)
             WORKING_MODEL = name
             print(f"[AI] {name} 모델로 연결했습니다. 다음 요청부터 이 모델을 씁니다.")
             return reply
