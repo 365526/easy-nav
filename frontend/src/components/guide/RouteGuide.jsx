@@ -3,40 +3,37 @@ import { API_URL } from "../../api.jsx";
 import { lineColor } from "../route/routeUtils.js";
 import GuideRobot from "./GuideRobot.jsx";
 
-// AI 길잡이 (워크북 9·10): 고른 경로의 역별 안내와 직접 질문을 카드 하나에서 합니다.
+// AI 길잡이 (워크북 9·10·11): 고른 경로의 역별 안내와 직접 질문을 카드 하나에서 합니다.
 //  빨리 갈아타기·휠체어·유모차(/guide/route): 출발·환승·도착역 안내를 한 번에 모아 역마다 보여 줌
-//  직접 질문하기: 역 안내(/guide/ask, 빠른하차·엘리베이터) 또는 이용 규정(/guide/terms, 여객운송약관)
+//  직접 질문하기(/guide/question): 서버가 질문의 낱말을 보고 역 안내(빠른하차·엘리베이터)와 이용 규정(여객운송약관) 중 한쪽에서 찾음
+//   두 쪽 낱말이 다 있으면 어느 쪽인지 되묻고(choose), 답 아래의 "○○에서 다시 찾기"로 다른 쪽에서도 찾아볼 수 있음
 //  route가 없으면(경로를 찾기 전) 직접 질문하기만 쓸 수 있습니다. station: 질문에 역 이름이 없을 때 쓸 도착역
-//  phase: idle(처음) · work(찾는 중) · reply(답) · miss(못 찾음 또는 오류)
+//  phase: idle(처음) · work(찾는 중) · reply(답) · miss(못 찾음 또는 오류) · choose(어느 쪽인지 묻기)
 const MODES = [
   { id: "fast", name: "빨리 갈아타기" },
   { id: "access", name: "휠체어·유모차" },
   { id: "ask", name: "직접 질문하기" },
 ];
-const TOPICS = [
-  {
-    id: "station",
-    name: "역 안내",
-    path: "/guide/ask",
-    idle: "역 엘리베이터 위치나 빨리 내리는 칸처럼, 역에서 궁금한 것을 물어보세요.",
-    example: (station) => `예: ${station ? station.replace(/역$/, "") : "강남"}역 엘리베이터 위치`,
-    note: "서울교통공사 빠른하차정보·교통약자이용정보(1~8호선)에서 찾은 내용으로만 답합니다. 엘리베이터 가동 여부는 역 안내를 함께 확인해 주세요.",
-  },
-  {
-    id: "terms",
-    name: "이용 규정",
-    path: "/guide/terms",
-    idle: "자전거, 반려동물, 환불, 부가운임처럼 지하철 이용 규정을 물어보세요. 여객운송약관에서 맞는 조항을 찾아 답해요.",
-    example: () => "예: 자전거 가지고 타도 돼?",
-    note: "서울교통공사 여객운송약관(1~8호선)에서 찾은 조항으로만 답합니다. 정확한 적용은 역 직원에게 함께 확인해 주세요.",
-  },
-];
+// 고른 쪽에서 다시 찾을 때 부르는 주소. ask: 되물을 때 버튼 글
+const TOPICS = {
+  station: { name: "역 안내", path: "/guide/ask", ask: "역 시설이 궁금해요" },
+  terms: { name: "이용 규정", path: "/guide/terms", ask: "타는 규칙이 궁금해요" },
+};
+const IDLE_ASK = "역 엘리베이터·빨리 내리는 칸이나, 자전거·반려동물·요금 같은 이용 규정을 물어보세요. 질문에 맞는 자료를 골라 찾아요.";
+const sampleQuestions = (station) => {
+  const name = station ? station.replace(/역$/, "") : "강남";
+  return [`${name}역 엘리베이터 위치`, `${name}역 빨리 내리는 칸`, "자전거 가지고 타도 돼?", "돈 안 내고 탔다가 걸리면?"];
+};
+const NOTE =
+  "역 안내는 서울교통공사 빠른하차정보·교통약자이용정보, 이용 규정은 서울교통공사 여객운송약관(1~8호선)에서 찾은 내용으로만 답합니다. 엘리베이터 가동 여부와 정확한 규정 적용은 역 직원에게 함께 확인해 주세요.";
 const IDLE_ROUTE = "이 길의 출발·환승·도착역 안내를 한 번에 모아 드릴게요. 안내 방식을 고르거나 직접 물어보세요.";
 const DONE = "역마다 공공데이터에서 찾은 안내를 모았어요.";
 const EMPTY = "이 길의 역들은 서울교통공사 자료(1~8호선)에 안내가 없어 만들지 못했어요.";
 const FAIL = "지금은 답을 가져오지 못했어요. 잠시 뒤 다시 해 주세요.";
 const MIN_WORK = 1200; // 답이 빨리 와도 "찾는 중"을 이만큼(ms)은 보여 줌
-const NO_ANSWER = { answer: "", sources: [], articles: [], checked: true, keywords: [] };
+const SLOW_AFTER = 8000; // 이만큼(ms) 넘게 걸리면 서버가 깨어나는 중이라고 알려 줌
+const SLOW = "서버가 쉬고 있었다면 깨어나는 데 1분까지 걸릴 수 있어요. 조금만 기다려 주세요.";
+const NO_ANSWER = { topic: null, auto: false, answer: "", sources: [], articles: [], checked: true, keywords: [] };
 
 const stationName = (name) => (name.endsWith("역") ? name : `${name}역`);
 
@@ -124,14 +121,24 @@ export default function RouteGuide({ route = null, station = "" }) {
   const [mode, setMode] = useState(route ? null : "ask");
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null); // 역별 안내 (빨리 갈아타기·휠체어·유모차)
-  const [topic, setTopic] = useState("station");
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState(NO_ANSWER); // 직접 질문의 답
+  const [asked, setAsked] = useState(""); // 마지막으로 보낸 질문 (다른 쪽에서 다시 찾을 때 씀)
+  const [answer, setAnswer] = useState(NO_ANSWER); // 직접 질문의 답. topic: 찾은 쪽, auto: 서버가 고른 쪽인지
+  const [slow, setSlow] = useState(false); // 찾는 중이 SLOW_AFTER보다 길어졌는지
   const ctrl = useRef(null);
-  const current = TOPICS.find((t) => t.id === topic);
 
   // 화면을 떠나면 받던 답을 멈춥니다.
   useEffect(() => () => ctrl.current?.abort(), []);
+
+  // 찾는 중이 오래 걸리면 안내 글을 보여 주고, 찾기가 끝나면 지웁니다.
+  useEffect(() => {
+    if (phase !== "work") return;
+    const timer = setTimeout(() => setSlow(true), SLOW_AFTER);
+    return () => {
+      clearTimeout(timer);
+      setSlow(false);
+    };
+  }, [phase]);
 
   function start() {
     ctrl.current?.abort();
@@ -174,25 +181,35 @@ export default function RouteGuide({ route = null, station = "" }) {
     setPhase(done.phase);
   }
 
-  function pickTopic(id) {
-    if (id === topic || phase === "work") return;
-    setTopic(id);
-    setPhase("idle");
-    setAnswer(NO_ANSWER);
+  // 질문 창의 물어보기와 예시 질문 칩이 함께 씁니다.
+  function ask(e) {
+    e.preventDefault();
+    send(question);
   }
 
-  async function ask(e) {
-    e.preventDefault();
-    const q = question.trim();
+  function askSample(q) {
+    setQuestion(q);
+    send(q);
+  }
+
+  // force가 없으면 서버가 찾을 쪽을 고르고(/guide/question), force("station"·"terms")가 있으면 그쪽에서만 찾습니다.
+  async function send(text, force = null) {
+    const q = text.trim();
     if (!q || phase === "work") return;
+    setAsked(q);
     const started = start();
     let done;
     try {
-      const params = new URLSearchParams(topic === "terms" ? { question: q } : { question: q, station });
-      const res = await fetch(`${API_URL}${current.path}?${params}`, { signal: ctrl.current.signal });
+      const path = force ? TOPICS[force].path : "/guide/question";
+      const params = new URLSearchParams(force === "terms" ? { question: q } : { question: q, station });
+      const res = await fetch(`${API_URL}${path}?${params}`, { signal: ctrl.current.signal });
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
-      done = data.found ? { phase: "reply", ...toAnswer(topic, data) } : { phase: "miss", ...NO_ANSWER, answer: data.answer };
+      const topic = force || data.topic;
+      const auto = !force;
+      if (topic === "choose") done = { phase: "choose", ...NO_ANSWER, answer: data.answer };
+      else if (data.found) done = { phase: "reply", ...toAnswer(topic, data), topic, auto };
+      else done = { phase: "miss", ...NO_ANSWER, answer: data.answer, topic, auto };
     } catch (err) {
       if (err.name === "AbortError") return;
       done = { phase: "miss", ...NO_ANSWER, answer: FAIL };
@@ -206,12 +223,13 @@ export default function RouteGuide({ route = null, station = "" }) {
   const asking = mode === "ask";
   const hasAny = result?.stops.some((s) => s.tip || s.facts.length > 0);
   let text;
-  if (phase === "idle") text = asking ? current.idle : IDLE_ROUTE;
+  if (phase === "idle") text = asking ? IDLE_ASK : IDLE_ROUTE;
   else if (asking) text = answer.answer;
   else if (phase === "miss") text = FAIL;
   else text = hasAny ? result.summary || DONE : EMPTY;
   const face = phase === "work" ? "work" : phase === "miss" || (phase === "reply" && !asking && !hasAny) ? "error" : "done";
-  const label = asking ? `직접 질문하기 · ${current.name}` : MODES.find((m) => m.id === mode)?.name;
+  const label = asking ? `직접 질문하기${answer.topic && phase !== "work" ? ` · ${TOPICS[answer.topic].name}` : ""}` : MODES.find((m) => m.id === mode)?.name;
+  const other = answer.topic === "station" ? "terms" : "station"; // 답 아래 "다시 찾기"로 갈 쪽
 
   return (
     <section aria-label="AI 길잡이" className="flex flex-col gap-5 rounded-2xl border border-[#2C2366] bg-[#120E2E] p-5 md:p-6">
@@ -274,6 +292,7 @@ export default function RouteGuide({ route = null, station = "" }) {
                   text
                 )}
               </p>
+              {phase === "work" && slow && <p className="mt-2 text-[12px] text-[#8A86B8]">{SLOW}</p>}
               {asking && phase === "reply" && answer.sources.length > 0 && (
                 <p className="mt-2 text-[12px] text-[#8A86B8]">근거: {answer.sources.join(" · ")}</p>
               )}
@@ -307,6 +326,29 @@ export default function RouteGuide({ route = null, station = "" }) {
 
       {asking && (
         <>
+          {phase === "choose" && (
+            <div role="group" aria-label="어느 쪽에서 찾을까요" className="flex flex-wrap gap-2">
+              {Object.entries(TOPICS).map(([id, t]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => send(asked, id)}
+                  className="min-h-[44px] rounded-xl border border-[#39FFB0] bg-[#0A0B1E] px-4 text-[15px] font-black text-[#39FFB0] hover:bg-[#39FFB0] hover:text-[#0A0B1E]"
+                >
+                  {t.ask}
+                </button>
+              ))}
+            </div>
+          )}
+          {(phase === "reply" || phase === "miss") && answer.auto && (
+            <button
+              type="button"
+              onClick={() => send(asked, other)}
+              className="self-start text-[13px] font-bold text-[#A9A6D6] underline underline-offset-4 hover:text-[#22E5FF]"
+            >
+              {TOPICS[other].name}에서 다시 찾기
+            </button>
+          )}
           {phase === "reply" && answer.articles.length > 0 && (
             <details open={!answer.checked} className="rounded-xl bg-[#0A0B1E] px-4 py-3 text-[13px] text-[#C9C6EE]">
               <summary className="cursor-pointer select-none font-bold text-[#A9A6D6] hover:text-[#22E5FF]">
@@ -325,21 +367,6 @@ export default function RouteGuide({ route = null, station = "" }) {
             </details>
           )}
           <div className="flex flex-col gap-2">
-            <div role="group" aria-label="질문 종류" className="flex gap-2">
-              {TOPICS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  aria-pressed={topic === t.id}
-                  onClick={() => pickTopic(t.id)}
-                  className={`min-h-[36px] rounded-full border px-3 text-[13px] font-extrabold transition-colors ${
-                    topic === t.id ? "border-[#39FFB0] text-[#39FFB0]" : "border-[#2C2366] text-[#A9A6D6] hover:border-[#39FFB0]"
-                  }`}
-                >
-                  {t.name}
-                </button>
-              ))}
-            </div>
             <form onSubmit={ask} className="flex flex-col gap-2 sm:flex-row">
               <label htmlFor="guide-question" className="sr-only">AI 길잡이에게 질문하기</label>
               <input
@@ -347,7 +374,7 @@ export default function RouteGuide({ route = null, station = "" }) {
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 maxLength={100}
-                placeholder={current.example(station)}
+                placeholder={`예: ${station ? station.replace(/역$/, "") : "강남"}역 엘리베이터 위치, 자전거 가지고 타도 돼?`}
                 className="min-h-[48px] flex-1 rounded-xl border border-[#2C2366] bg-[#0A0B1E] px-4 text-[16px] text-[#F2F4FF] placeholder:text-[#6F6B9E] focus:border-[#22E5FF] focus:outline-none"
               />
               <button
@@ -358,7 +385,20 @@ export default function RouteGuide({ route = null, station = "" }) {
                 물어보기
               </button>
             </form>
-            <p className="text-[13px] leading-relaxed text-[#8A86B8]">{current.note}</p>
+            <div role="group" aria-label="예시 질문" className="flex flex-wrap gap-2">
+              {sampleQuestions(station).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={phase === "work"}
+                  onClick={() => askSample(q)}
+                  className="min-h-[36px] rounded-full border border-[#2C2366] bg-[#0A0B1E] px-3 text-[13px] font-bold text-[#C9C6EE] hover:border-[#22E5FF] hover:text-[#22E5FF] disabled:opacity-40"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+            <p className="text-[13px] leading-relaxed text-[#8A86B8]">{NOTE}</p>
           </div>
         </>
       )}

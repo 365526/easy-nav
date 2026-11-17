@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from guide import ask as guide_ask, guide_route, search as guide_search
 from route_logic import MAX_EXTRA_MINUTES, avoid_candidates, describe_route, fetch_route, level_info, no_data_entry, rank_routes
 from terms import ask_terms, terms_info
+from topic import CHOOSE, pick_topic
 
 load_dotenv()
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -247,6 +248,20 @@ def route_guide(body: RouteGuideRequest):
     legs = [leg.model_dump(by_alias=True) for leg in body.legs]
     with db() as conn:
         return guide_route(conn, legs, body.mode)
+
+
+@app.get("/guide/question", tags=["안내 도우미"], summary="직접 질문: 역 안내와 이용 규정 중 맞는 쪽에서 찾아 답함")
+def ask_question(question: str = Query(..., min_length=1, max_length=100, description="예: 자전거 가지고 타도 돼?"),
+                 station: str = Query("", description="질문에 역 이름이 없을 때 쓸 역. 예: 경로 찾기의 도착역")):
+    """질문의 낱말로 역 안내(/guide/ask)와 이용 규정(/guide/terms) 중 한쪽을 골라 답합니다. topic에 고른 쪽이 들어갑니다.
+    두 쪽 낱말이 다 있으면(예: 캐리어 들고 엘리베이터 타도 돼?) AI를 부르지 않고 topic: choose로 어느 쪽인지 되묻습니다."""
+    topic = pick_topic(question)
+    if topic == "choose":
+        return {"topic": topic, "found": False, "answer": CHOOSE}
+    if topic == "terms":
+        return {"topic": topic, **ask_terms(question)}
+    with db() as conn:
+        return {"topic": topic, **guide_ask(conn, question, station)}
 
 
 @app.get("/guide/terms", tags=["안내 도우미"], summary="이용 규정 묻기 (여객운송약관 조항으로만 답함)")
