@@ -54,7 +54,7 @@ export default function RouteFinder() {
 
       <form onSubmit={submit} className="flex flex-col gap-6 rounded-2xl border border-[#2C2366] bg-[#120E2E] p-5 md:p-6">
         <div className="grid items-end gap-3 md:grid-cols-[1fr_48px_1fr]">
-          <StationInput id="from" label="출발역" value={form.from} onChange={set("from")} />
+          <StationInput id="from" label="출발역" value={form.from} onChange={set("from")} placeholder="역 이름 (예: 신도림)" />
           <button
             type="button"
             aria-label="출발역과 도착역 바꾸기"
@@ -63,7 +63,7 @@ export default function RouteFinder() {
           >
             ⇄
           </button>
-          <StationInput id="to" label="도착역" value={form.to} onChange={set("to")} />
+          <StationInput id="to" label="도착역" value={form.to} onChange={set("to")} placeholder="역 이름 (예: 강남)" />
         </div>
 
         <button

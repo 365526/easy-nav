@@ -10,6 +10,7 @@ import json
 import os
 import re
 import ssl
+import time
 import urllib.error
 import urllib.request
 from fastapi import HTTPException
@@ -35,12 +36,13 @@ def find_stations(question, names):
     """질문에 나온 역 이름을 찾습니다. 더 긴 이름을 먼저 봐서 '서울대입구'가 '서울'로 잘못 잡히지 않게 합니다."""
     text = question.replace(" ", "")
     pairs = sorted(((key, name) for name in names for key in name_keys(name)), key=lambda p: -len(p[0]))
-    found = []
+    found = {}  # 역 이름: 질문 속 자리
     for key, name in pairs:
-        if key in text and name not in found:
-            found.append(name)
-            text = text.replace(key, " ")   # 찾은 부분은 지워서 더 짧은 이름이 겹쳐 잡히지 않게 함
-    return found[:2]
+        at = text.find(key)
+        if at >= 0 and name not in found:
+            found[name] = at
+            text = text.replace(key, " " * len(key))   # 찾은 부분은 지워서 더 짧은 이름이 겹쳐 잡히지 않게 함 (자리는 그대로)
+    return sorted(found, key=found.get)[:2]   # 질문에 나온 순서대로. 예: 신도림 강남 → 출발역, 도착역
 
 
 def pick_sources(question):
@@ -66,6 +68,10 @@ def search(conn, question, station=""):
     if elevator_only:
         # 엘리베이터만 묻는 질문에는 빠른하차정보 중 엘리베이터와 가까운 칸만 남깁니다.
         rows = [r for r in rows if r["source"] == "교통약자이용정보" or "엘리베이터" in r["content"]]
+    if len(stations) > 1:
+        # 역마다 나눠 담습니다. 자료가 많은 역이 20줄을 다 채워 다른 역 자료가 빠지지 않게 합니다.
+        each = LIMIT // len(stations)
+        rows = [r for s in stations for r in [x for x in rows if x["station"] == s][:each]]
     return {"stations": stations, "sources": sources, "docs": rows[:LIMIT]}
 
 
@@ -99,16 +105,25 @@ def model_version(name):
 
 def call_model(opener, model, key, body):
     """모델 하나에 요청을 보내고, AI가 돌려준 JSON 글자를 파이썬 값으로 바꿉니다.
-    3 이상 모델은 답하기 전에 생각(thinking)을 하고, 그 글자도 maxOutputTokens 안에서 씁니다. 그래서 생각을 짧게(low) 하게 합니다."""
+    3 이상 모델은 답하기 전에 생각(thinking)을 하고, 그 글자도 maxOutputTokens 안에서 씁니다. 그래서 생각을 짧게(low) 하게 합니다.
+    온도는 정한 값(0~0.2)을 그대로 보냅니다(11-2). 기본값(1.0)이면 같은 자료·같은 질문에도 found가 그때그때 달라졌습니다.
+    AI 서버가 붐벼 500·503이 오면 2초 쉬고 같은 모델로 한 번 더 보냅니다."""
     config = dict(body["generationConfig"])
     if model_version(model) >= 3:
-        config.pop("temperature", None)  # 구글 안내: 3 이상은 온도를 1.0 아래로 낮추면 같은 말을 되풀이할 수 있어 기본값으로 둡니다.
         config["thinkingConfig"] = {"thinkingLevel": "low"}
     data = json.dumps({**body, "generationConfig": config}).encode("utf-8")
-    request = urllib.request.Request(f"{API}/{model}:generateContent", data=data, method="POST",
-                                     headers={"x-goog-api-key": key, "Content-Type": "application/json"})
-    with opener.open(request, timeout=30) as resp:
-        parts = json.loads(resp.read().decode("utf-8"))["candidates"][0]["content"]["parts"]
+    for attempt in (1, 2):
+        request = urllib.request.Request(f"{API}/{model}:generateContent", data=data, method="POST",
+                                         headers={"x-goog-api-key": key, "Content-Type": "application/json"})
+        try:
+            with opener.open(request, timeout=30) as resp:
+                parts = json.loads(resp.read().decode("utf-8"))["candidates"][0]["content"]["parts"]
+            break
+        except urllib.error.HTTPError as e:
+            if e.code not in (500, 503) or attempt == 2:
+                raise
+            print(f"[AI] {model} 모델이 붐벼서({e.code}) 2초 뒤 한 번 더 보냅니다.")
+            time.sleep(2)
     text = "".join(p.get("text", "") for p in parts).strip()
     return json.loads(re.sub(r"^```(json)?|```$", "", text, flags=re.MULTILINE).strip())
 
@@ -182,18 +197,24 @@ def generate_json(rules, prompt, temperature=0.2):
 
 SOURCE_NAMES = {"빠른하차정보": "서울교통공사 빠른하차정보", "교통약자이용정보": "서울교통공사 교통약자이용정보"}
 NOT_FOUND = "안내를 찾지 못했어요. 역 이름과 함께 엘리베이터 위치나 빨리 내리는 칸을 물어봐 주세요."
+NO_REPLY = "{stations} 자료는 찾았지만 답을 정리하지 못했어요. 방면이나 설비(계단·엘리베이터)를 함께 물어보거나 잠시 뒤 다시 물어봐 주세요."
 
 RULES = """너는 서울 지하철 안내 도우미다.
 - [자료]에 적힌 내용만 근거로 답한다. 자료에 없는 출구 번호, 칸 번호, 위치, 시간은 절대 지어내지 않는다.
 - [자료]로 답할 수 없는 질문이면 found를 false로 한다.
-- 답은 한국어 존댓말 '~요' 체로, 두 문장 안에서 짧게 쓴다.
+- [질문]에 역 이름이 없으면 그 아래 (물은 역)을 물은 것으로 본다. 경로를 찾은 사용자가 출발역·도착역을 묻는 경우다.
+- 엘리베이터 위치를 물으면 자료의 출입구 번호, 방면과 칸-문 번호, 오가는 층으로 답한다. 자료에 그 역의 엘리베이터 줄이 있으면 found는 true다.
+- 빨리 내리는 칸을 물으면 방면마다 가까운 칸-문 하나씩 설비 이름과 함께 답한다. 설비를 말하지 않았으면 계단이나 에스컬레이터 쪽 칸으로 답한다.
+- 답은 한국어 존댓말 '~요' 체로 쓴다. 자료에 역이 하나면 두 문장 안에서 짧게, 둘이면 역마다 '○○역: '으로 시작하는 한 문장씩 쓴다.
 - 방향(방면)에 따라 다르면 대표적인 방면을 하나 들고 방면 이름을 함께 말한다.
 - {"found": true 또는 false, "answer": "답"} 모양의 JSON으로만 답한다."""
 
 
-def ask_llm(question, docs):
+def ask_llm(question, docs, stations=()):
     facts = "\n".join(f"- ({d['source']}) {d['content']}" for d in docs)
-    reply = generate_json(RULES, f"[자료]\n{facts}\n\n[질문]\n{question}")
+    names = ", ".join(s if s.endswith("역") else f"{s}역" for s in stations)
+    asked = f"\n(물은 역: {names})" if names else ""  # "엘리베이터 어디야"처럼 역 이름이 없는 질문도 어느 역인지 알게 합니다.
+    reply = generate_json(RULES, f"[자료]\n{facts}\n\n[질문]\n{question}{asked}")
     return {"found": bool(reply.get("found")), "answer": str(reply.get("answer") or "").strip()}
 
 
@@ -211,9 +232,10 @@ def ask(conn, question, station=""):
     found = search(conn, question, station)
     if not found["docs"]:
         return {"found": False, "answer": NOT_FOUND, "stations": found["stations"], "sources": []}
-    reply = ask_llm(question, found["docs"])
+    reply = ask_llm(question, found["docs"], found["stations"])
     if not reply["found"] or not reply["answer"]:
-        return {"found": False, "answer": NOT_FOUND, "stations": found["stations"], "sources": []}
+        names = "·".join(s if s.endswith("역") else f"{s}역" for s in found["stations"])
+        return {"found": False, "answer": NO_REPLY.format(stations=names), "stations": found["stations"], "sources": []}
     return {"found": True, "answer": reply["answer"], "stations": found["stations"], "sources": source_list(found["docs"])}
 
 

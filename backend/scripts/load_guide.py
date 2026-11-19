@@ -6,6 +6,7 @@
 backend 폴더에서 python scripts/load_guide.py 로 실행합니다. 다시 실행하면 표를 비우고 새로 채웁니다.
 """
 import os
+import re
 from datetime import datetime
 
 import psycopg
@@ -91,17 +92,37 @@ def fast_exit_doc(item):
     return line, station, sentence
 
 
+def elevator_kind(name):
+    """시설 이름에서 쓸모 있는 것만 꺼냅니다. 예: '승강기)엘리베이터-강남 외선 8-1 내부#1' → 내부 엘리베이터(승강장↔대합실)
+    이름 속 칸 번호·#번호는 관리용이라 위치 설명과 다를 수 있어 쓰지 않습니다(11 실습 05: 신도림 3-2 ↔ 4-4·7-4).
+    섬식: 선로 사이 승강장 하나에서 양쪽 방면 열차를 탑니다."""
+    if "내부" in name:
+        kind = "내부 엘리베이터(승강장↔대합실"
+    elif "외부" in name:
+        kind = "외부 엘리베이터(대합실↔지상"
+    else:
+        return "엘리베이터"
+    return kind + (", 양쪽 방면 같은 승강장)" if "섬식" in name else ")")
+
+
+def floor(updown, number):
+    """'지하', 'B2' → '지하 2층'. 지하·지상과 B·F가 겹쳐 적힌 것을 한 번만 씁니다."""
+    number = re.sub(r"^[BF](?=\d)", "", text(number))
+    return f"{text(updown)} {number}층".strip() if number else ""
+
+
 def elevator_doc(item):
-    """교통약자이용정보(엘리베이터) 한 줄 → 사람이 읽는 문장 한 개"""
+    """교통약자이용정보(엘리베이터) 한 줄 → 사람이 읽는 문장 한 개 (11-2에서 다듬음)"""
     line, station = text(item.get("lineNm")), text(item.get("stnNm"))
-    name, place = text(item.get("fcltNm")), text(item.get("dtlPstn"))
-    sentence = f"{line} {station_name(item)} {name if '엘리베이터' in name else '엘리베이터'}: {place}."
-    start = " ".join(v for v in (text(item.get("bgngFlrGrndUdgdSe")), text(item.get("bgngFlr"))) if v)
-    end = " ".join(v for v in (text(item.get("endFlrGrndUdgdSe")), text(item.get("endFlr"))) if v)
+    place = text(item.get("dtlPstn"))
+    place = re.sub(r"\s*,\s*", ", ", re.sub(r"방면\s*(?=\d)", "방면 ", place))  # 역삼 방면8-1,교대 방면3-4 → 역삼 방면 8-1, 교대 방면 3-4
+    sentence = f"{line} {station_name(item)} {elevator_kind(text(item.get('fcltNm')))}: {place}."
+    start = floor(item.get("bgngFlrGrndUdgdSe"), item.get("bgngFlr"))
+    end = floor(item.get("endFlrGrndUdgdSe"), item.get("endFlr"))
     if start and end:
-        sentence += f" 오가는 층: {start}층 ↔ {end}층."
+        sentence += f" 오가는 층: {start} ↔ {end}."
     exit_no = text(item.get("vcntEntrcNo"))
-    if exit_no:
+    if re.search(r"\d", exit_no):  # '내부'처럼 번호가 아닌 값은 쓰지 않습니다.
         sentence += f" 가까운 출입구: {exit_no}{'번' if exit_no.isdigit() else ''}."
     return line, station, sentence
 

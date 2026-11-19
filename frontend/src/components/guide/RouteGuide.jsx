@@ -117,7 +117,7 @@ function Stop({ stop, next }) {
   );
 }
 
-export default function RouteGuide({ route = null, station = "" }) {
+export default function RouteGuide({ route = null, station = "", from = "" }) {
   const [mode, setMode] = useState(route ? null : "ask");
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null); // 역별 안내 (빨리 갈아타기·휠체어·유모차)
@@ -201,7 +201,9 @@ export default function RouteGuide({ route = null, station = "" }) {
     let done;
     try {
       const path = force ? TOPICS[force].path : "/guide/question";
-      const params = new URLSearchParams(force === "terms" ? { question: q } : { question: q, station });
+      // 경로를 찾은 뒤에는 출발역과 도착역을 함께 보냅니다. 질문에 역 이름이 없으면 두 역을 모두 안내합니다(11-2).
+      const near = route && from ? `${from} ${station}` : station;
+      const params = new URLSearchParams(force === "terms" ? { question: q } : { question: q, station: near });
       const res = await fetch(`${API_URL}${path}?${params}`, { signal: ctrl.current.signal });
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
@@ -349,6 +351,11 @@ export default function RouteGuide({ route = null, station = "" }) {
               {TOPICS[other].name}에서 다시 찾기
             </button>
           )}
+          {phase === "reply" && route && answer.topic === "station" && (
+            <p className="text-[13px] leading-relaxed text-[#A9A6D6]">
+              갈아타는 역까지 보려면 위의 <strong className="text-[#F2F4FF]">휠체어·유모차</strong>를 눌러 보세요. 출발·환승·도착역을 경로 순서대로 모아 드려요.
+            </p>
+          )}
           {phase === "reply" && answer.articles.length > 0 && (
             <details open={!answer.checked} className="rounded-xl bg-[#0A0B1E] px-4 py-3 text-[13px] text-[#C9C6EE]">
               <summary className="cursor-pointer select-none font-bold text-[#A9A6D6] hover:text-[#22E5FF]">
@@ -374,7 +381,8 @@ export default function RouteGuide({ route = null, station = "" }) {
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 maxLength={100}
-                placeholder={`예: ${station ? station.replace(/역$/, "") : "강남"}역 엘리베이터 위치, 자전거 가지고 타도 돼?`}
+                autoComplete="off"
+                placeholder="궁금한 것을 물어보세요"
                 className="min-h-[48px] flex-1 rounded-xl border border-[#2C2366] bg-[#0A0B1E] px-4 text-[16px] text-[#F2F4FF] placeholder:text-[#6F6B9E] focus:border-[#22E5FF] focus:outline-none"
               />
               <button
@@ -385,7 +393,10 @@ export default function RouteGuide({ route = null, station = "" }) {
                 물어보기
               </button>
             </form>
-            <div role="group" aria-label="예시 질문" className="flex flex-wrap gap-2">
+            <div role="group" aria-labelledby="guide-samples" className="flex flex-wrap items-center gap-2">
+              <span id="guide-samples" className="text-[12px] font-bold text-[#8A86B8]">
+                질문 예시
+              </span>
               {sampleQuestions(station).map((q) => (
                 <button
                   key={q}
